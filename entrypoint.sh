@@ -27,9 +27,4 @@ if [ "$1" == "kubelet" ]; then
     exec "$@" --cgroup-driver=$CGROUPDRIVER
 fi
 
-if [ "$1" == "kube-proxy" ]; then
-    #share-root.sh /var/lib/rancher /var/lib/kubelet >/dev/null 2>&1 || true
-    share-root.sh /var/lib/rancher /var/lib/kubelet
-fi
-
 exec "$@"
