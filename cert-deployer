@@ -7,7 +7,7 @@ for i in $(env | grep -o KUBE_.*=); do
   name="$(echo "$i" | cut -f1 -d"=" | tr '[:upper:]' '[:lower:]' | tr '_' '-').pem"
   env=$(echo "$i" | cut -f1 -d"=")
   value=$(echo "${!env}")
-  if [ ! -f $SSL_CRTS_DIR/$name ] || [ "$FORCE_DEPLOY" == "true" ]; then
+  if [ ! -f $SSL_CRTS_DIR/$name ] || [ "$FORCE_DEPLOY" = "true" ]; then
     echo "$value" > $SSL_CRTS_DIR/$name
   fi
 done

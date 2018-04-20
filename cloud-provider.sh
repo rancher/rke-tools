@@ -14,7 +14,7 @@ set_azure_config() {
   local azure_tenant_id=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .tenantId)
 
   # setting correct login cloud
-  if [ "${azure_cloud}" == "null" ] || [ "${azure_cloud}" == "" ]; then
+  if [ "${azure_cloud}" = "null" ] || [ "${azure_cloud}" = "" ]; then
       azure_cloud="AzureCloud"
   fi
   az cloud set --name ${azure_cloud}
