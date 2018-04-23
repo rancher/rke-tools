@@ -23,6 +23,12 @@ if [ "$1" = "kubelet" ]; then
              mkdir -p $i/kubepods
         fi
     done
+
+    mkdir -p /sys/fs/cgroup/cpuacct,cpu/
+    mount --bind /sys/fs/cgroup/cpu,cpuacct/ /sys/fs/cgroup/cpuacct,cpu/
+    mkdir -p /sys/fs/cgroup/net_prio,net_cls/
+    mount --bind /sys/fs/cgroup/net_cls,net_prio/ /sys/fs/cgroup/net_prio,net_cls/
+
     CGROUPDRIVER=$(/opt/rke/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
     exec "$@" --cgroup-driver=$CGROUPDRIVER
 fi
