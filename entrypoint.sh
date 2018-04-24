@@ -29,6 +29,11 @@ if [ "$1" = "kubelet" ]; then
     mkdir -p /sys/fs/cgroup/net_prio,net_cls/
     mount --bind /sys/fs/cgroup/net_cls,net_prio/ /sys/fs/cgroup/net_prio,net_cls/
 
+    # If we are running on SElinux host, need to:
+    mkdir -p /opt/cni /etc/cni
+    chcon -Rt svirt_sandbox_file_t /etc/cni 2>/dev/null || true
+    chcon -Rt svirt_sandbox_file_t /opt/cni 2>/dev/null || true
+
     CGROUPDRIVER=$(/opt/rke/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
     exec "$@" --cgroup-driver=$CGROUPDRIVER
 fi
