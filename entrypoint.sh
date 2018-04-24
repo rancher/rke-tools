@@ -34,6 +34,12 @@ if [ "$1" = "kubelet" ]; then
     chcon -Rt svirt_sandbox_file_t /etc/cni 2>/dev/null || true
     chcon -Rt svirt_sandbox_file_t /opt/cni 2>/dev/null || true
 
+    if [ -f /host/usr/lib/os-release ]; then
+        ln -sf /host/usr/lib/os-release /usr/lib/os-release
+    elif [ -f /host/etc/os-release ]; then
+        ln -sf /host/etc/os-release /usr/lib/os-release
+    fi
+
     CGROUPDRIVER=$(/opt/rke/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
     exec "$@" --cgroup-driver=$CGROUPDRIVER
 fi
