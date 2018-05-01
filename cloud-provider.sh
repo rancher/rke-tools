@@ -32,6 +32,7 @@ set_azure_config() {
 if [ -z "$az_subscription_id" ] || [ -z "$az_location" ] || [ -z "$az_resources_group" ] || [ -z "$az_vnet_resource_group" ] || [ -z "$az_subnet_name" ] || [ -z "$az_vnet_name" ]; then
   echo "Some variables were not populated correctly, using the passed config!"
 else
+  local cloud_config_temp=$(mktemp)
   cat "$AZURE_CLOUD_CONFIG_PATH" |\
   jq '.subscriptionId=''"'${az_subscription_id}'"''' |\
   jq '.location=''"'${az_location}'"''' |\
@@ -39,6 +40,8 @@ else
   jq '.vnetResourceGroup=''"'${az_vnet_resource_group}'"''' |\
   jq '.subnetName=''"'${az_subnet_name}'"''' |\
   jq '.useInstanceMetadata=true' |\
-  jq '.vnetName=''"'${az_vnet_name}'"''' | tee $AZURE_CLOUD_CONFIG_PATH
+  jq '.vnetName=''"'${az_vnet_name}'"''' > $cloud_config_temp
+  # move the temp to the azure cloud config path
+  mv $cloud_config_temp $AZURE_CLOUD_CONFIG_PATH
 fi
 }
