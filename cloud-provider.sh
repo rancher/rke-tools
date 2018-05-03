@@ -26,10 +26,11 @@ set_azure_config() {
   local az_subnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
   local az_vnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
   local az_vnet_resource_group=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
+  local az_vm_nsg=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
 
   az logout 2>&1 > /dev/null
 
-if [ -z "$az_subscription_id" ] || [ -z "$az_location" ] || [ -z "$az_resources_group" ] || [ -z "$az_vnet_resource_group" ] || [ -z "$az_subnet_name" ] || [ -z "$az_vnet_name" ]; then
+if [ -z "$az_subscription_id" ] || [ -z "$az_location" ] || [ -z "$az_resources_group" ] || [ -z "$az_vnet_resource_group" ] || [ -z "$az_subnet_name" ] || [ -z "$az_vnet_name" ] || [ -z "$az_vm_nsg" ]; then
   echo "Some variables were not populated correctly, using the passed config!"
 else
   local cloud_config_temp=$(mktemp)
@@ -40,6 +41,7 @@ else
   jq '.vnetResourceGroup=''"'${az_vnet_resource_group}'"''' |\
   jq '.subnetName=''"'${az_subnet_name}'"''' |\
   jq '.useInstanceMetadata=true' |\
+  jq '.securityGroupName=''"'${az_vm_nsg}'"''' |\
   jq '.vnetName=''"'${az_vnet_name}'"''' > $cloud_config_temp
   # move the temp to the azure cloud config path
   mv $cloud_config_temp $AZURE_CLOUD_CONFIG_PATH
