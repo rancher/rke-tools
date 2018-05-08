@@ -1,0 +1,11 @@
+imports:
+  github.com/Sirupsen/logrus:
+    package: github.com/Sirupsen/logrus
+    version: v0.10.0
+    update: false
+    options: {}
+  github.com/urfave/cli:
+    package: github.com/urfave/cli
+    version: v1.18.0
+    update: false
+    options: {}
