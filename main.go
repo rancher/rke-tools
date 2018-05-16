@@ -42,6 +42,11 @@ func RollingBackupCommand() cli.Command {
 		Usage:  "Perform rolling backups",
 		Action: RollingBackupAction,
 		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "endpoints",
+				Usage: "Etcd endpoints",
+				Value: "127.0.0.1:2379",
+			},
 			cli.DurationFlag{
 				Name:  "creation",
 				Usage: "Create backups after this time interval in minutes",
@@ -100,6 +105,7 @@ func RollingBackupAction(c *cli.Context) error {
 	etcdCert := c.String("cert")
 	etcdCACert := c.String("cacert")
 	etcdKey := c.String("key")
+	etcdEndpoints := c.String("endpoints")
 	if len(etcdCert) == 0 || len(etcdCACert) == 0 || len(etcdKey) == 0 {
 		return fmt.Errorf("Failed to find etcd cert or key paths")
 	}
@@ -113,20 +119,20 @@ func RollingBackupAction(c *cli.Context) error {
 		if len(backupName) == 0 {
 			backupName = fmt.Sprintf("%s_etcd", time.Now().Format(time.RFC3339))
 		}
-		return CreateBackup(backupName, etcdCACert, etcdCert, etcdKey)
+		return CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
 	}
 	backupTicker := time.NewTicker(creationPeriod)
 	for {
 		select {
 		case backupTime := <-backupTicker.C:
 			backupName := fmt.Sprintf("%s_etcd", backupTime.Format(time.RFC3339))
-			CreateBackup(backupName, etcdCACert, etcdCert, etcdKey)
+			CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
 			DeleteBackups(backupTime, retentionPeriod)
 		}
 	}
 }
 
-func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey string) error {
+func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints string) error {
 	failureInterval := 15 * time.Second
 	backupDir := fmt.Sprintf("%s/%s", backupBaseDir, backupName)
 	var err error
@@ -136,7 +142,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey string) error
 		}
 		// check if the cluster is healthy
 		cmd := exec.Command("etcdctl",
-			"--endpoints=[127.0.0.1:2379]",
+			fmt.Sprintf("--endpoints=[%s]", endpoints),
 			"--cacert="+etcdCACert,
 			"--cert="+etcdCert,
 			"--key="+etcdKey,
@@ -152,7 +158,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey string) error
 		}
 
 		cmd = exec.Command("etcdctl",
-			"--endpoints=[127.0.0.1:2379]",
+			fmt.Sprintf("--endpoints=[%s]", endpoints),
 			"--cacert="+etcdCACert,
 			"--cert="+etcdCert,
 			"--key="+etcdKey,
