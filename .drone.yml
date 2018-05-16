@@ -2,7 +2,7 @@
 pipeline:
   publish-rke-certs-deployer:
     image: plugins/docker
-    dockerfile: Dockerfile
+    dockerfile: package/Dockerfile
     repo: rancher/rke-tools
     context: package/
     tag: ${DRONE_TAG}
