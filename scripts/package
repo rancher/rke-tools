@@ -17,7 +17,7 @@ if echo $TAG | grep -q dirty; then
 fi
 
 cp ../bin/rke-etcd-backup .
-cp -r ../{conf.d,cert-deployer,templates,entrypoint.sh,nginx-proxy,cloud-provider.sh} .
+cp -r ../{conf.d,cert-deployer,templates,nginx-proxy,*.sh} .
 
 IMAGE=${REPO}/rke-tools:${TAG}
 docker build -t ${IMAGE} .
