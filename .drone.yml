@@ -1,8 +1,25 @@
 ---
 pipeline:
-  publish-rke-certs-deployer:
+  build:
+    privileged: true
+    image: rancher/dapper:1.11.2
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+    - dapper ci
+
+  stage-binaries:
+    image: rancher/dapper:1.11.2
+    commands:
+    - cp -r ./bin/* ./package/
+    when:
+      branch: master
+      event: tag
+
+  publish-rke-tools:
     image: plugins/docker
     dockerfile: package/Dockerfile
+    context: package/
     repo: rancher/rke-tools
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
