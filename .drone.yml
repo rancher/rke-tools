@@ -4,7 +4,6 @@ pipeline:
     image: plugins/docker
     dockerfile: package/Dockerfile
     repo: rancher/rke-tools
-    context: package/
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]
     when:
