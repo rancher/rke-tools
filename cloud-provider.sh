@@ -1,7 +1,7 @@
 #!/bin/bash
 
 AZURE_META_URL="http://169.254.169.254/metadata/instance/compute"
-AZURE_CLOUD_CONFIG_PATH="/etc/kubernetes/cloud-config.json"
+AZURE_CLOUD_CONFIG_PATH="/etc/kubernetes/cloud-config"
 
 set_azure_config() {
   local az_resources_group=$(curl  -s -H Metadata:true "${AZURE_META_URL}/resourceGroupName?api-version=2017-08-01&format=text")
