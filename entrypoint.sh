@@ -38,6 +38,8 @@ if [ "$1" = "kubelet" ]; then
         ln -sf /host/usr/lib/os-release /usr/lib/os-release
     elif [ -f /host/etc/os-release ]; then
         ln -sf /host/etc/os-release /usr/lib/os-release
+    elif [ -f /host/usr/share/ros/os-release ]; then
+        ln -sf /host/usr/share/ros/os-release /usr/lib/os-release
     fi
 
     CGROUPDRIVER=$(/opt/rke/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
