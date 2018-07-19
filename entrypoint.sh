@@ -34,6 +34,10 @@ if [ "$1" = "kubelet" ]; then
     chcon -Rt svirt_sandbox_file_t /etc/cni 2>/dev/null || true
     chcon -Rt svirt_sandbox_file_t /opt/cni 2>/dev/null || true
 
+    # Set this to 1 as required by network plugins
+    # https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#network-plugin-requirements
+    sysctl -w net.bridge.bridge-nf-call-iptables=1 || true
+
     if [ -f /host/usr/lib/os-release ]; then
         ln -sf /host/usr/lib/os-release /usr/lib/os-release
     elif [ -f /host/etc/os-release ]; then
