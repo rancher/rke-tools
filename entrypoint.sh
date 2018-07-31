@@ -46,8 +46,19 @@ if [ "$1" = "kubelet" ]; then
         ln -sf /host/usr/share/ros/os-release /usr/lib/os-release
     fi
 
+    # Check if no other or additional resolv-conf is passed (default is configured as /etc/resolv.conf)
+    if echo "$@" | grep -q -- --resolv-conf=/etc/resolv.conf; then
+        # Check if host is running `system-resolved`
+        if pgrep -f systemd-resolved > /dev/null; then
+            # Check if the resolv.conf with the actual nameservers is present
+            if [ -f /run/systemd/resolve/resolv.conf ]; then
+                RESOLVCONF="--resolv-conf=/run/systemd/resolve/resolv.conf"
+            fi
+        fi
+    fi
+
     CGROUPDRIVER=$(/opt/rke/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
-    exec "$@" --cgroup-driver=$CGROUPDRIVER
+    exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF
 fi
 
 exec "$@"
