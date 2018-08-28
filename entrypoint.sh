@@ -57,7 +57,14 @@ if [ "$1" = "kubelet" ]; then
         fi
     fi
 
+    if [ ! -z "${RKE_KUBELET_DOCKER_CONFIG}" ]
+    then
+      echo ${RKE_KUBELET_DOCKER_CONFIG} | base64 -d | tee ${RKE_KUBELET_DOCKER_FILE}
+    fi
+
     CGROUPDRIVER=$(/opt/rke-tools/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
+
+    # final step for kubelet
     exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF
 fi
 
