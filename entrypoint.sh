@@ -2,7 +2,7 @@
 
 # generate Azure cloud provider config
 if echo ${@} | grep -q "cloud-provider=azure"; then
-  if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ]; then
+  if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
     source /opt/rke-tools/cloud-provider.sh
     set_azure_config
   fi
