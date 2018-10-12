@@ -1,27 +1,131 @@
----
-pipeline:
-  build:
-    privileged: true
-    image: rancher/dapper:1.11.2
+kind: pipeline
+name: amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: build
+    image: rancher/dapper:v0.4.1
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
+      - name: docker
+        path: /var/run/docker.sock
     commands:
-    - dapper ci
-
-  stage-binaries:
-    image: rancher/dapper:1.11.2
+      - dapper ci
+  - name: stage-binaries
+    image: rancher/dapper:v0.4.1
     commands:
-    - cp -r ./bin/* ./
+      - cp -r ./bin/* ./
     when:
-      branch: master
-      event: tag
-
-  publish-rke-tools:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+  - name: publish-rke-tools-amd64
     image: plugins/docker
-    dockerfile: package/Dockerfile
-    repo: rancher/rke-tools
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      dockerfile: package/Dockerfile
+      build_args:
+        - ARCH=amd64
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-amd64"
     when:
-      branch: master
-      event: tag
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+---
+kind: pipeline
+name: arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+  - name: build
+    image: rancher/dapper:v0.4.1
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    commands:
+      - dapper ci
+  - name: stage-binaries
+    image: rancher/dapper:v0.4.1
+    commands:
+      - cp -r ./bin/* ./
+    when:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+  - name: publish-rke-tools-arm64
+    image: plugins/docker:linux-arm64 
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      dockerfile: package/Dockerfile
+      build_args:
+        - ARCH=arm64
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-arm64"
+    when:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+---
+kind: pipeline
+name: manifest
+
+steps:
+  - name: push-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      target: "rancher/rke-tools:${DRONE_TAG}"
+      template: "rancher/rke-tools:${DRONE_TAG}-ARCH"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    when:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+depends_on:
+- amd64
+- arm64
