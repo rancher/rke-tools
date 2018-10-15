@@ -1,7 +1,7 @@
 FROM nginx:1.14.0-alpine
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
-RUN apk -U --no-cache add bash curl wget ca-certificates \
+RUN apk -U --no-cache add bash curl wget ca-certificates tar sysstat\
     && mkdir -p /opt/rke-tools/bin /etc/confd \
     && curl -sLf https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-linux-amd64 > /usr/bin/confd \
     && chmod +x /usr/bin/confd \
