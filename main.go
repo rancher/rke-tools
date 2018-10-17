@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -85,6 +89,22 @@ func RollingBackupCommand() cli.Command {
 				Usage:  "Etcd client key path",
 				EnvVar: "ETCD_KEY",
 			},
+			cli.BoolTFlag{
+				Name:  "s3",
+				Usage: "Upload backup to AWS S3",
+			},
+			cli.StringFlag{
+				Name:  "s3bucket",
+				Usage: "AWS S3 bucket to upload to",
+			},
+			cli.StringFlag{
+				Name:  "s3creds",
+				Usage: "AWS S3 credentials (B64-encoded bytes)",
+			},
+			cli.StringFlag{
+				Name:  "s3conf",
+				Usage: "AWS S3 configuration (B64-encoded bytes)",
+			},
 		},
 	}
 }
@@ -114,12 +134,41 @@ func RollingBackupAction(c *cli.Context) error {
 		"retention": retentionPeriod,
 	}).Info("Initializing Rolling Backups")
 
+	s3bucket := ""
+	if c.Bool("s3") {
+		s3bucket = c.String("s3bucket")
+		_ = os.Mkdir("/root/.aws", 0777)
+
+		s3creds, err := base64.StdEncoding.DecodeString(c.String("s3creds"))
+		if err != nil {
+			return fmt.Errorf("Failed to decode S3 credentials")
+		}
+		err = ioutil.WriteFile("/root/.aws/credentials", s3creds, 0777)
+		if err != nil {
+			return fmt.Errorf("Failed to write AWS credentials file")
+		}
+
+		s3conf, err := base64.StdEncoding.DecodeString(c.String("s3conf"))
+		if err != nil {
+			return fmt.Errorf("Failed to decode S3 config")
+		}
+		err = ioutil.WriteFile("/root/.aws/config", s3conf, 0777)
+		if err != nil {
+			return fmt.Errorf("Failed to write AWS config file")
+		}
+
+	}
+
 	if c.Bool("once") {
 		backupName := c.String("name")
 		if len(backupName) == 0 {
 			backupName = fmt.Sprintf("%s_etcd", time.Now().Format(time.RFC3339))
 		}
-		return CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
+		err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
+		if err == nil && c.Bool("s3") {
+			err = UploadBackupToS3(backupName, s3bucket)
+		}
+		return err
 	}
 	backupTicker := time.NewTicker(creationPeriod)
 	for {
@@ -127,6 +176,9 @@ func RollingBackupAction(c *cli.Context) error {
 		case backupTime := <-backupTicker.C:
 			backupName := fmt.Sprintf("%s_etcd", backupTime.Format(time.RFC3339))
 			CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
+			if c.Bool("s3") {
+				UploadBackupToS3(backupName, s3bucket)
+			}
 			DeleteBackups(backupTime, retentionPeriod)
 		}
 	}
@@ -183,6 +235,46 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		break
 	}
 	return err
+}
+
+// UploadBackupToS3 uploads the snapshot to AWS S3, adding a <hostname> suffix to the name
+func UploadBackupToS3(backupName, s3bucket string) error {
+	// requires credentials in ~/.aws/credentials
+	session := session.Must(session.NewSession())
+
+	uploader := s3manager.NewUploader(session)
+	backupDir := fmt.Sprintf("%s/%s", backupBaseDir, backupName)
+	backup, err := os.Open(backupDir)
+	if err != nil {
+		return fmt.Errorf("Failed to open backup file %s, %v", backupDir, err)
+	}
+
+	// if we have a full S3 path, use the first part as bucket name and the rest for the key
+	s3key := backupName
+	split := strings.SplitN(s3bucket, "/", 2)
+	if len(split) >= 2 {
+		s3bucket = split[0]
+		s3key = split[1]
+		if !strings.HasSuffix(s3key, "/") {
+			s3key = s3key + "/"
+		}
+		s3key = s3key + backupName
+	}
+
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(s3bucket),
+		Key:    aws.String(s3key),
+		Body:   backup,
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to upload backup, %v", err)
+	}
+	log.WithFields(log.Fields{
+		"backup": backupName,
+		"bucket": result.Location,
+	}).Info("Uploaded backup")
+
+	return nil
 }
 
 func DeleteBackups(backupTime time.Time, retentionPeriod time.Duration) {
