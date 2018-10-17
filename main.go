@@ -166,7 +166,7 @@ func RollingBackupAction(c *cli.Context) error {
 		}
 		err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
 		if err == nil && c.Bool("s3") {
-			err = UploadBackupToS3(backupName, s3bucket)
+			err = UploadBackupToS3(backupName, s3bucket, etcdEndpoints)
 		}
 		return err
 	}
@@ -177,7 +177,7 @@ func RollingBackupAction(c *cli.Context) error {
 			backupName := fmt.Sprintf("%s_etcd", backupTime.Format(time.RFC3339))
 			CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints)
 			if c.Bool("s3") {
-				UploadBackupToS3(backupName, s3bucket)
+				UploadBackupToS3(backupName, s3bucket, etcdEndpoints)
 			}
 			DeleteBackups(backupTime, retentionPeriod)
 		}
@@ -238,7 +238,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 }
 
 // UploadBackupToS3 uploads the snapshot to AWS S3, adding a <hostname> suffix to the name
-func UploadBackupToS3(backupName, s3bucket string) error {
+func UploadBackupToS3(backupName, s3bucket, etcdEndpoints string) error {
 	// requires credentials in ~/.aws/credentials
 	session := session.Must(session.NewSession())
 
@@ -250,6 +250,7 @@ func UploadBackupToS3(backupName, s3bucket string) error {
 	}
 
 	// if we have a full S3 path, use the first part as bucket name and the rest for the key
+	backupName = backupName + "-etcdendpoints_" + etcdEndpoints
 	s3key := backupName
 	split := strings.SplitN(s3bucket, "/", 2)
 	if len(split) >= 2 {
