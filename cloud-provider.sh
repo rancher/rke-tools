@@ -12,6 +12,7 @@ set_azure_config() {
   local azure_client_id=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .aadClientId)
   local azure_client_secret=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .aadClientSecret)
   local azure_tenant_id=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .tenantId)
+  local az_vm_nsg=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .securityGroupName)
 
   # setting correct login cloud
   if [ "${azure_cloud}" = "null" ] || [ "${azure_cloud}" = "" ]; then
@@ -26,7 +27,10 @@ set_azure_config() {
   local az_subnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
   local az_vnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
   local az_vnet_resource_group=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
-  local az_vm_nsg=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
+
+  if [ -z "$az_vm_nsg" ] ; then
+    az_vm_nsg=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
+  fi
 
   az logout 2>&1 > /dev/null
 
