@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/pkg/credentials"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -107,7 +108,10 @@ func main() {
 	app.Commands = []cli.Command{
 		RollingBackupCommand(),
 	}
-	app.Run(os.Args)
+	err = app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func RollingBackupCommand() cli.Command {
@@ -346,7 +350,12 @@ func setS3Service(server *s3Server, useSSL bool) (*minio.Client, error) {
 	var svc = &minio.Client{}
 
 	for retries := 0; retries <= s3ServerRetries; retries++ {
-		if len(server.Region) != 0 {
+		// if the s3 access key and secret is not set use iam role
+		if len(server.AccessKey) == 0 && len(server.SecretKey) == 0 {
+			log.Info("invoking set s3 service client use IAM role")
+			iam := credentials.NewIAM("")
+			svc, err = minio.NewWithCredentials("s3.amazonaws.com", iam, true, "")
+		} else if len(server.Region) != 0 {
 			svc, err = minio.NewWithRegion(server.Endpoint, server.AccessKey, server.SecretKey, useSSL, server.Region)
 		} else {
 			svc, err = minio.New(server.Endpoint, server.AccessKey, server.SecretKey, useSSL)
@@ -427,6 +436,7 @@ func DownloadBackupAction(c *cli.Context) error {
 			continue
 		}
 		log.Infof("Successfully download %s from s3 server", fileName)
+		break
 	}
 	return nil
 }
