@@ -3,5 +3,11 @@
 # Run confd
 confd -onetime -backend env
 
+# fix non-root issues
+# allow logging to tty
+adduser nginx tty
+# allow non-root to create pid file in /run
+chmod 1777 /run
+
 # Start nginx
-nginx -g 'daemon off;'
+exec su -s /bin/sh nginx -c "/usr/sbin/nginx -g 'daemon off;'"
