@@ -1,4 +1,4 @@
-FROM nginx:1.14.0-alpine
+FROM nginx:1.14.2-alpine
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
 RUN apk -U --no-cache add bash curl wget ca-certificates tar sysstat\
