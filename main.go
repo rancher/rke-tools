@@ -216,7 +216,17 @@ func RollingBackupAction(c *cli.Context) error {
 		if len(backupName) == 0 {
 			backupName = fmt.Sprintf("%s_etcd", time.Now().Format(time.RFC3339))
 		}
-		return CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc)
+		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
+			return err
+		}
+		prefix := getNamePrefix(backupName)
+		// we only clean named backups if we have a retention period and a cluster name prefix
+		if retentionPeriod != 0 && len(prefix) != 0 {
+			if err := DeleteNamedBackups(retentionPeriod, prefix); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	backupTicker := time.NewTicker(creationPeriod)
 	for {
@@ -319,12 +329,12 @@ func DeleteBackups(backupTime time.Time, retentionPeriod time.Duration) {
 			}).Warn("Couldn't parse backup")
 
 		} else if backupTime.Before(cutoffTime) {
-			DeleteBackup(file)
+			_ = DeleteBackup(file)
 		}
 	}
 }
 
-func DeleteBackup(file os.FileInfo) {
+func DeleteBackup(file os.FileInfo) error {
 	toDelete := fmt.Sprintf("%s/%s", backupBaseDir, file.Name())
 
 	cmd := exec.Command("rm", "-r", toDelete)
@@ -338,13 +348,13 @@ func DeleteBackup(file os.FileInfo) {
 			"name":  file.Name(),
 			"error": err2,
 		}).Warn("Delete backup failed")
-
-	} else {
-		log.WithFields(log.Fields{
-			"name":    file.Name(),
-			"runtime": endTime.Sub(startTime),
-		}).Info("Deleted backup")
+		return err2
 	}
+	log.WithFields(log.Fields{
+		"name":    file.Name(),
+		"runtime": endTime.Sub(startTime),
+	}).Info("Deleted backup")
+	return nil
 }
 
 func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *minio.Client, bc *backupConfig) {
@@ -491,4 +501,33 @@ func DownloadBackupAction(c *cli.Context) error {
 		break
 	}
 	return nil
+}
+
+func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
+	files, err := ioutil.ReadDir(backupBaseDir)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"dir":   backupBaseDir,
+			"error": err,
+		}).Warn("Can't read backup directory")
+		return err
+	}
+	cutoffTime := time.Now().Add(retentionPeriod * -1)
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), prefix) && file.ModTime().Before(cutoffTime) {
+			if err = DeleteBackup(file); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func getNamePrefix(name string) string {
+	re := regexp.MustCompile("^c-[a-z0-9].*?-")
+	m := re.FindStringSubmatch(name)
+	if len(m) == 0 {
+		return ""
+	}
+	return m[0]
 }
