@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -20,6 +25,7 @@ const (
 	backupRetries   = 4
 	s3ServerRetries = 3
 	contentType     = "application/zip"
+	ServerPort      = "2379"
 )
 
 var commonFlags = []cli.Flag{
@@ -51,6 +57,11 @@ var commonFlags = []cli.Flag{
 		Name:   "key",
 		Usage:  "Etcd client key path",
 		EnvVar: "ETCD_KEY",
+	},
+	cli.StringFlag{
+		Name:   "local-endpoint",
+		Usage:  "Local backup download endpoint",
+		EnvVar: "LOCAL_ENDPOINT",
 	},
 	cli.BoolFlag{
 		Name:   "s3-backup",
@@ -148,9 +159,35 @@ func RollingBackupCommand() cli.Command {
 			},
 			{
 				Name:   "download",
-				Usage:  "Download specified snapshot from s3 storage server",
+				Usage:  "Download specified snapshot from s3 compatible storage or another local endpoint",
 				Flags:  commonFlags,
 				Action: DownloadBackupAction,
+			},
+			{
+				Name:  "serve",
+				Usage: "Provide HTTPS endpoint to pull local snapshot",
+				Flags: []cli.Flag{
+					cli.StringFlag{
+						Name:  "name",
+						Usage: "Backup name to take once",
+					},
+					cli.StringFlag{
+						Name:   "cacert",
+						Usage:  "Etcd CA client certificate path",
+						EnvVar: "ETCD_CACERT",
+					},
+					cli.StringFlag{
+						Name:   "cert",
+						Usage:  "Etcd client certificate path",
+						EnvVar: "ETCD_CERT",
+					},
+					cli.StringFlag{
+						Name:   "key",
+						Usage:  "Etcd client key path",
+						EnvVar: "ETCD_KEY",
+					},
+				},
+				Action: ServeBackupAction,
 			},
 		},
 	}
@@ -463,6 +500,13 @@ func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string) 
 func DownloadBackupAction(c *cli.Context) error {
 	log.Info("Initializing Download Backups")
 	SetLoggingLevel(c.Bool("debug"))
+	if c.Bool("s3-backup") {
+		return DownloadS3Backup(c)
+	}
+	return DownloadLocalBackup(c)
+}
+
+func DownloadS3Backup(c *cli.Context) error {
 	bc := &backupConfig{
 		Endpoint:   c.String("s3-endpoint"),
 		AccessKey:  c.String("s3-accessKey"),
@@ -503,6 +547,44 @@ func DownloadBackupAction(c *cli.Context) error {
 	return nil
 }
 
+func DownloadLocalBackup(c *cli.Context) error {
+	snapshot := path.Base(c.String("name"))
+	endpoint := c.String("local-endpoint")
+	if snapshot == "." || snapshot == "/" {
+		return fmt.Errorf("snapshot name is required")
+	}
+	if len(endpoint) == 0 {
+		return fmt.Errorf("local-endpoint is required")
+	}
+	certs, err := getCertsFromCli(c)
+	if err != nil {
+		return err
+	}
+	tlsConfig, err := setupTLSConfig(certs, false)
+	if err != nil {
+		return err
+	}
+	client := http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+
+	snapshotFile, err := os.Create(fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
+	if err != nil {
+		return err
+	}
+	defer snapshotFile.Close()
+	log.Infof("Invoking downloading backup files: %s", snapshot)
+	resp, err := client.Get(fmt.Sprintf("https://%s:%s/%s", endpoint, ServerPort, snapshot))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if _, err := io.Copy(snapshotFile, resp.Body); err != nil {
+		return err
+	}
+	log.Infof("Successfully download %s from %s ", snapshot, endpoint)
+	return nil
+}
+
 func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
 	files, err := ioutil.ReadDir(backupBaseDir)
 	if err != nil {
@@ -530,4 +612,67 @@ func getNamePrefix(name string) string {
 		return ""
 	}
 	return m[0]
+}
+
+func ServeBackupAction(c *cli.Context) error {
+	snapshot := path.Base(c.String("name"))
+
+	if snapshot == "." || snapshot == "/" {
+		return fmt.Errorf("snapshot name is required")
+	}
+	certs, err := getCertsFromCli(c)
+	if err != nil {
+		return err
+	}
+	tlsConfig, err := setupTLSConfig(certs, true)
+	if err != nil {
+		return err
+	}
+	httpServer := &http.Server{
+		Addr:      fmt.Sprintf("0.0.0.0:%s", ServerPort),
+		TLSConfig: tlsConfig,
+	}
+
+	http.HandleFunc(fmt.Sprintf("/%s", snapshot), func(response http.ResponseWriter, request *http.Request) {
+		http.ServeFile(response, request, fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
+	})
+	return httpServer.ListenAndServeTLS(certs["cert"], certs["key"])
+}
+
+func getCertsFromCli(c *cli.Context) (map[string]string, error) {
+	caCert := c.String("cacert")
+	cert := c.String("cert")
+	key := c.String("key")
+	if len(cert) == 0 || len(caCert) == 0 || len(key) == 0 {
+		return nil, fmt.Errorf("cacert, cert and key are required")
+	}
+
+	return map[string]string{"cacert": caCert, "cert": cert, "key": key}, nil
+}
+
+func setupTLSConfig(certs map[string]string, isServer bool) (*tls.Config, error) {
+	caCertPem, err := ioutil.ReadFile(certs["cacert"])
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig := &tls.Config{}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertPem)
+	if isServer {
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		tlsConfig.ClientCAs = certPool
+		tlsConfig.MinVersion = tls.VersionTLS12
+	} else { // client config
+		x509Pair, err := tls.LoadX509KeyPair(certs["cert"], certs["key"])
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{x509Pair}
+		tlsConfig.RootCAs = certPool
+		// This is to avoid IP SAN errors.
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	tlsConfig.BuildNameToCertificate()
+	return tlsConfig, nil
 }
