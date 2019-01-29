@@ -11,6 +11,7 @@ RUN apk -U --no-cache add bash curl wget ca-certificates tar sysstat\
 
 RUN mkdir -p /opt/cni/bin
 RUN wget -q -O - https://github.com/containernetworking/cni/releases/download/v0.4.0/cni-amd64-v0.4.0.tgz | tar xzf - -C /tmp
+RUN wget -q -O /tmp/portmap https://github.com/projectcalico/cni-plugin/releases/download/v1.9.1/portmap
 
 RUN wget -q -O - https://github.com/coreos/etcd/releases/download/v3.0.17/etcd-v3.0.17-linux-amd64.tar.gz | tar xzf - -C /tmp && \
     mv /tmp/etcd-*/etcdctl /usr/local/bin/etcdctl && \
@@ -20,7 +21,7 @@ RUN wget -q -O - https://github.com/coreos/etcd/releases/download/v3.0.17/etcd-v
 COPY templates /etc/confd/templates/
 COPY conf.d /etc/confd/conf.d/
 COPY cert-deployer nginx-proxy /usr/bin/
-COPY entrypoint.sh cloud-provider.sh weave-loopback-cni.sh /opt/rke-tools/
+COPY entrypoint.sh cloud-provider.sh weave-plugins-cni.sh /opt/rke-tools/
 COPY rke-etcd-backup /opt/rke-tools
 
 VOLUME /opt/rke-tools
