@@ -26,6 +26,7 @@ const (
 	s3ServerRetries = 3
 	contentType     = "application/zip"
 	ServerPort      = "2379"
+	s3Endpoint      = "s3.amazonaws.com"
 )
 
 var commonFlags = []cli.Flag{
@@ -409,7 +410,7 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 	defer close(doneCh)
 
 	isRecursive := false
-	objectCh := svc.ListObjectsV2(bc.BucketName, "", isRecursive, doneCh)
+	objectCh := svc.ListObjects(bc.BucketName, "", isRecursive, doneCh)
 	re := regexp.MustCompile(".+_etcd$")
 	for object := range objectCh {
 		if object.Err != nil {
@@ -447,18 +448,25 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 	log.Info("invoking set s3 service client")
 	var err error
 	var svc = &minio.Client{}
-
+	var cred = &credentials.Credentials{}
+	bucketLookup := getBucketLookupType(bc.Endpoint)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
 		// if the s3 access key and secret is not set use iam role
 		if len(bc.AccessKey) == 0 && len(bc.SecretKey) == 0 {
 			log.Info("invoking set s3 service client use IAM role")
-			iam := credentials.NewIAM("")
-			svc, err = minio.NewWithCredentials("s3.amazonaws.com", iam, true, "")
-		} else if len(bc.Region) != 0 {
-			svc, err = minio.NewWithRegion(bc.Endpoint, bc.AccessKey, bc.SecretKey, useSSL, bc.Region)
+			cred = credentials.NewIAM("")
+			if bc.Endpoint == "" {
+				bc.Endpoint = s3Endpoint
+			}
 		} else {
-			svc, err = minio.New(bc.Endpoint, bc.AccessKey, bc.SecretKey, useSSL)
+			cred = credentials.NewStatic(bc.AccessKey, bc.SecretKey, "", credentials.SignatureDefault)
 		}
+		svc, err = minio.NewWithOptions(bc.Endpoint, &minio.Options{
+			Creds:        cred,
+			Secure:       useSSL,
+			Region:       bc.Region,
+			BucketLookup: bucketLookup,
+		})
 		if err != nil {
 			log.Infof("failed to init s3 client server: %v, retried %d times", err, retries)
 			if retries >= s3ServerRetries {
@@ -477,6 +485,16 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 		return nil, fmt.Errorf("bucket %s is not found", bc.BucketName)
 	}
 	return svc, nil
+}
+
+func getBucketLookupType(endpoint string) minio.BucketLookupType {
+	if endpoint == "" {
+		return minio.BucketLookupAuto
+	}
+	if strings.Contains(endpoint, "aliyun") {
+		return minio.BucketLookupDNS
+	}
+	return minio.BucketLookupAuto
 }
 
 func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string) error {
