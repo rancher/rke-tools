@@ -594,6 +594,10 @@ func DownloadLocalBackup(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("backup download failed: %v", resp.Body)
+		return fmt.Errorf("backup download failed: %v", resp.Body)
+	}
 	defer resp.Body.Close()
 
 	if _, err := io.Copy(snapshotFile, resp.Body); err != nil {
@@ -637,6 +641,9 @@ func ServeBackupAction(c *cli.Context) error {
 
 	if snapshot == "." || snapshot == "/" {
 		return fmt.Errorf("snapshot name is required")
+	}
+	if _, err := os.Stat(fmt.Sprintf("%s/%s", backupBaseDir, snapshot)); err != nil {
+		return err
 	}
 	certs, err := getCertsFromCli(c)
 	if err != nil {
