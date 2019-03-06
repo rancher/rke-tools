@@ -584,11 +584,6 @@ func DownloadLocalBackup(c *cli.Context) error {
 	}
 	client := http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 
-	snapshotFile, err := os.Create(fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
-	if err != nil {
-		return err
-	}
-	defer snapshotFile.Close()
 	log.Infof("Invoking downloading backup files: %s", snapshot)
 	resp, err := client.Get(fmt.Sprintf("https://%s:%s/%s", endpoint, ServerPort, snapshot))
 	if err != nil {
@@ -600,6 +595,11 @@ func DownloadLocalBackup(c *cli.Context) error {
 	}
 	defer resp.Body.Close()
 
+	snapshotFile, err := os.Create(fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
+	if err != nil {
+		return err
+	}
+	defer snapshotFile.Close()
 	if _, err := io.Copy(snapshotFile, resp.Body); err != nil {
 		return err
 	}
