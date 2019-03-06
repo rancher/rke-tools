@@ -271,10 +271,11 @@ func RollingBackupAction(c *cli.Context) error {
 		select {
 		case backupTime := <-backupTicker.C:
 			backupName := fmt.Sprintf("%s_etcd", backupTime.Format(time.RFC3339))
-			CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc)
-			DeleteBackups(backupTime, retentionPeriod)
-			if s3Backup {
-				DeleteS3Backups(backupTime, retentionPeriod, client, bc)
+			if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err == nil {
+				DeleteBackups(backupTime, retentionPeriod)
+				if s3Backup {
+					DeleteS3Backups(backupTime, retentionPeriod, client, bc)
+				}
 			}
 		}
 	}
@@ -330,7 +331,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		}).Info("Created backup")
 
 		if server.Backup {
-			err := uploadBackupFile(svc, server.BucketName, backupName, backupDir)
+			err = uploadBackupFile(svc, server.BucketName, backupName, backupDir)
 			if err == nil {
 				return nil
 			}
