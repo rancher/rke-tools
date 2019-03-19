@@ -211,6 +211,14 @@ func RollingBackupAction(c *cli.Context) error {
 	etcdCACert := c.String("cacert")
 	etcdKey := c.String("key")
 	etcdEndpoints := c.String("endpoints")
+	if creationPeriod == 0 || retentionPeriod == 0 {
+		log.WithFields(log.Fields{
+			"creation":  creationPeriod,
+			"retention": retentionPeriod,
+		}).Errorf("Creation period and/or retention are not set")
+		return fmt.Errorf("Creation period and/or retention are not set")
+	}
+
 	if len(etcdCert) == 0 || len(etcdCACert) == 0 || len(etcdKey) == 0 {
 		log.WithFields(log.Fields{
 			"etcdCert":   etcdCert,
@@ -219,11 +227,11 @@ func RollingBackupAction(c *cli.Context) error {
 		}).Errorf("Failed to find etcd cert or key paths")
 		return fmt.Errorf("Failed to find etcd cert or key paths")
 	}
+
 	log.WithFields(log.Fields{
 		"creation":  creationPeriod,
 		"retention": retentionPeriod,
 	}).Info("Initializing Rolling Backups")
-
 	s3Backup := c.Bool("s3-backup")
 	bc := &backupConfig{
 		Backup:     s3Backup,
@@ -619,7 +627,7 @@ func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
 	}
 	cutoffTime := time.Now().Add(retentionPeriod * -1)
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), prefix) && file.ModTime().Before(cutoffTime) {
+		if strings.HasPrefix(file.Name(), prefix) && file.ModTime().Before(cutoffTime) && IsRecurringSnapshot(file.Name()) {
 			if err = DeleteBackup(file); err != nil {
 				return err
 			}
@@ -701,4 +709,15 @@ func setupTLSConfig(certs map[string]string, isServer bool) (*tls.Config, error)
 
 	tlsConfig.BuildNameToCertificate()
 	return tlsConfig, nil
+}
+
+func IsRecurringSnapshot(name string) bool {
+	// name is fmt.Sprintf("%s-%s%s-", cluster.Name, typeFlag, providerFlag)
+	// typeFlag = "r": recurring
+	// typeFlag = "m": manaul
+	//
+	// providerFlag = "l" local
+	// providerFlag = "s" s3
+	re := regexp.MustCompile("^c-[a-z0-9].*?-r.-")
+	return re.MatchString(name)
 }
