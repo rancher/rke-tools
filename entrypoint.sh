@@ -1,5 +1,14 @@
 #!/bin/bash -x
 
+# If kubectl not exist, copy the kubectl binary to the /etc/kubernetes/ directory(Only master node).
+if [ "$1" = "kube-apiserver" ]; then
+  if [ ! -x '/etc/kubernetes/bin/kubectl' ]; then
+      mkdir -p /etc/kubernetes/bin
+      cp /usr/local/bin/kubectl /etc/kubernetes/bin/kubectl
+      chmod +x /etc/kubernetes/bin/kubectl
+  fi
+fi
+
 # generate Azure cloud provider config
 if echo ${@} | grep -q "cloud-provider=azure"; then
   if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
