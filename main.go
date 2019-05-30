@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -21,12 +22,13 @@ import (
 )
 
 const (
-	backupBaseDir   = "/backup"
-	backupRetries   = 4
-	s3ServerRetries = 3
-	contentType     = "application/zip"
-	ServerPort      = "2379"
-	s3Endpoint      = "s3.amazonaws.com"
+	backupBaseDir       = "/backup"
+	backupRetries       = 4
+	compressedExtension = "gz"
+	s3ServerRetries     = 3
+	contentType         = "application/zip"
+	ServerPort          = "2379"
+	s3Endpoint          = "s3.amazonaws.com"
 )
 
 var commonFlags = []cli.Flag{
@@ -333,13 +335,36 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			}).Warn("Backup failed")
 			continue
 		}
+		// Compress backup
+		compressedFilePath, err := compressFile(backupDir)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"attempt": retries + 1,
+				"error":   err,
+				"data":    string(data),
+			}).Warn("Compressing backup failed")
+			continue
+		}
+		// Set the full path to the compressed file for uploading
+		compressedFile := fmt.Sprintf("%s.%s", backupName, compressedExtension)
+		// Remove the original file after succesfully compressing it
+		err = os.Remove(backupDir)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"attempt": retries + 1,
+				"error":   err,
+				"data":    string(data),
+			}).Warn("Removing uncompressed snapshot file failed")
+
+		}
+
 		log.WithFields(log.Fields{
 			"name":    backupName,
 			"runtime": endTime.Sub(startTime),
 		}).Info("Created backup")
 
 		if server.Backup {
-			err = uploadBackupFile(svc, server.BucketName, backupName, backupDir)
+			err = uploadBackupFile(svc, server.BucketName, compressedFile, compressedFilePath)
 			if err == nil {
 				return nil
 			}
@@ -420,7 +445,7 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 
 	isRecursive := false
 	objectCh := svc.ListObjects(bc.BucketName, "", isRecursive, doneCh)
-	re := regexp.MustCompile(".+_etcd$")
+	re := regexp.MustCompile(".+_etcd(|.gz)$")
 	for object := range objectCh {
 		if object.Err != nil {
 			log.Error("error to fetch s3 file:", object.Err)
@@ -442,12 +467,12 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 	}
 
 	for i := range backupDeleteList {
-		log.Info("Start to delete s3 backup file:", backupDeleteList[i])
+		log.Infof("Start to delete s3 backup file [%s]", backupDeleteList[i])
 		err := svc.RemoveObject(bc.BucketName, backupDeleteList[i])
 		if err != nil {
-			log.Error("Error detected during deletion: ", err)
+			log.Errorf("Error detected during deletion: %v", err)
 		} else {
-			log.Info("Success delete s3 backup file:", backupDeleteList[i])
+			log.Infof("Success delete s3 backup file [%s]", backupDeleteList[i])
 		}
 	}
 }
@@ -550,28 +575,44 @@ func DownloadS3Backup(c *cli.Context) error {
 			"s3-accessKey":  bc.AccessKey,
 			"s3-region":     bc.Region,
 		}).Errorf("failed to set s3 server: %s", err)
-		return fmt.Errorf("faield to set s3 server: %+v", err)
+		return fmt.Errorf("failed to set s3 server: %+v", err)
 	}
 
 	fileName := c.String("name")
+	compressedFileName := fmt.Sprintf("%s.%s", fileName, compressedExtension)
 	if len(fileName) == 0 {
 		return fmt.Errorf("empty file name")
 	}
-
-	log.Infof("invoking downloading backup files: %s", fileName)
-	for retries := 0; retries <= s3ServerRetries; retries++ {
-		err := client.FGetObject(bc.BucketName, fileName, backupBaseDir+"/"+fileName, minio.GetObjectOptions{})
-		if err != nil {
-			log.Infof("failed to download etcd snapshot file: %v, retried %d times", err, retries)
-			if retries >= s3ServerRetries {
-				return fmt.Errorf("failed to download etcd snapshot file: %v", err)
+	// Check for both filenames (not compressed for backwards compatibility)
+	fileNameOptions := [2]string{compressedFileName, fileName}
+	for _, fileNameOption := range fileNameOptions {
+		log.Infof("Trying to download etcd snapshot file [%s] from endpoint [%s] and bucket [%s]", fileNameOption, bc.Endpoint, bc.BucketName)
+		for retries := 0; retries <= s3ServerRetries; retries++ {
+			err := client.FGetObject(bc.BucketName, fileNameOption, backupBaseDir+"/"+fileNameOption, minio.GetObjectOptions{})
+			if err != nil {
+				log.Infof("Failed to download etcd snapshot file [%s]: %v, retried %d times", fileNameOption, err, retries)
+				if retries >= s3ServerRetries {
+					log.Warningf("Failed to download etcd snapshot file [%s]: %v", fileNameOption, err)
+					break
+				}
+				continue
 			}
-			continue
+			log.Infof("Successfully downloaded [%s]", fileNameOption)
+			compressedFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, compressedFileName)
+			// Check if snapshot is compressed
+			if strings.EqualFold(fileNameOption, compressedFileName) {
+				log.Infof("Decompressing etcd snapshot file [%s]", fileNameOption)
+				fileLocation := fmt.Sprintf("%s/%s", backupBaseDir, fileName)
+				err := decompressFile(compressedFileLocation, fileLocation)
+				if err != nil {
+					return fmt.Errorf("Unable to decompress [%s] to [%s]", compressedFileLocation, fileLocation)
+				}
+				log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
+			}
+			return nil
 		}
-		log.Infof("Successfully download %s from s3 server", fileName)
-		break
 	}
-	return nil
+	return fmt.Errorf("Unable to download backup file for [%s]", fileName)
 }
 
 func DownloadLocalBackup(c *cli.Context) error {
@@ -593,8 +634,10 @@ func DownloadLocalBackup(c *cli.Context) error {
 	}
 	client := http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 
+	snapshotURL := fmt.Sprintf("https://%s:%s/%s", endpoint, ServerPort, snapshot)
 	log.Infof("Invoking downloading backup files: %s", snapshot)
-	resp, err := client.Get(fmt.Sprintf("https://%s:%s/%s", endpoint, ServerPort, snapshot))
+	log.Infof("Trying to download backup file from: %s", snapshotURL)
+	resp, err := client.Get(snapshotURL)
 	if err != nil {
 		return err
 	}
@@ -604,14 +647,17 @@ func DownloadLocalBackup(c *cli.Context) error {
 	}
 	defer resp.Body.Close()
 
-	snapshotFile, err := os.Create(fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
+	snapshotFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, snapshot)
+	snapshotFile, err := os.Create(snapshotFileLocation)
 	if err != nil {
 		return err
 	}
 	defer snapshotFile.Close()
+
 	if _, err := io.Copy(snapshotFile, resp.Body); err != nil {
 		return err
 	}
+
 	log.Infof("Successfully download %s from %s ", snapshot, endpoint)
 	return nil
 }
@@ -651,6 +697,16 @@ func ServeBackupAction(c *cli.Context) error {
 	if snapshot == "." || snapshot == "/" {
 		return fmt.Errorf("snapshot name is required")
 	}
+	// Check if snapshot is compressed
+	compressedFileLocation := fmt.Sprintf("%s/%s.%s", backupBaseDir, snapshot, compressedExtension)
+	if _, err := os.Stat(compressedFileLocation); err == nil {
+		err := decompressFile(compressedFileLocation, fmt.Sprintf("%s/%s", backupBaseDir, snapshot))
+		if err != nil {
+			return err
+		}
+		log.Infof("Extracted from %s", compressedFileLocation)
+	}
+
 	if _, err := os.Stat(fmt.Sprintf("%s/%s", backupBaseDir, snapshot)); err != nil {
 		return err
 	}
@@ -720,4 +776,84 @@ func IsRecurringSnapshot(name string) bool {
 	// providerFlag = "s" s3
 	re := regexp.MustCompile("^c-[a-z0-9].*?-r.-")
 	return re.MatchString(name)
+}
+
+func compressFile(fileName string) (string, error) {
+	// Check if source file exists
+	fileToZip, err := os.Open(fileName)
+	if err != nil {
+		return "", err
+	}
+	defer fileToZip.Close()
+
+	// Create destination file
+	compressedFile := fmt.Sprintf("%s.%s", fileName, compressedExtension)
+	zipFile, err := os.Create(compressedFile)
+	if err != nil {
+		return "", err
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	header := &zip.FileHeader{
+		Name:   fileName,
+		Method: zip.Deflate,
+	}
+
+	header.SetModTime(time.Unix(0, 0))
+
+	writer, err := zipWriter.CreateHeader(header)
+	if err != nil {
+		return "", err
+	}
+	_, err = io.Copy(writer, fileToZip)
+	if err != nil {
+		return "", err
+	}
+	return compressedFile, nil
+}
+
+// decompressFile: Thanks to https://golangcode.com/unzip-files-in-go/
+func decompressFile(src string, dest string) error {
+
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+
+		outFile, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(outFile, rc)
+
+		// Close the file without defer to close before next iteration of loop
+		outFile.Close()
+		rc.Close()
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readZipFile(zf *zip.File) ([]byte, error) {
+	f, err := zf.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ioutil.ReadAll(f)
 }
