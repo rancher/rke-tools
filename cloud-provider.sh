@@ -32,22 +32,22 @@ set_azure_config() {
     az_resources_group="$az_vm_resources_group"
   fi
 
-  local az_vm_nic=$(az vm nic list -g ${az_vm_resources_group} --vm-name ${az_vm_name} | jq -r .[0].id | cut -d "/" -f 9)
+  local az_vm_nic=$(az vm nic list -g ${az_resources_group} --vm-name ${az_vm_name} | jq -r .[0].id | cut -d "/" -f 9)
 
   if [ -z "$az_subnet_name" ] ; then
-    az_subnet_name=$(az vm nic show -g ${az_vm_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
+    az_subnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
   fi
 
   if [ -z "$az_vnet_name" ] ; then
-    az_vnet_name=$(az vm nic show -g ${az_vm_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
+    az_vnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
   fi
 
   if [ -z "$az_vnet_resource_group" ] ; then
-    az_vnet_resource_group=$(az vm nic show -g ${az_vm_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
+    az_vnet_resource_group=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
   fi
 
   if [ -z "$az_vm_nsg" ] ; then
-    az_vm_nsg=$(az vm nic show -g ${az_vm_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
+    az_vm_nsg=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
   fi
 
   az logout 2>&1 > /dev/null
