@@ -2,6 +2,7 @@
 
 SSL_CRTS_DIR=${CRTS_DEPLOY_PATH:-/etc/kubernetes/ssl}
 mkdir -p $SSL_CRTS_DIR
+chmod 700 $SSL_CRTS_DIR
 
 for i in $(env | grep -o KUBE_.*=); do
   name="$(echo "$i" | cut -f1 -d"=" | tr '[:upper:]' '[:lower:]' | tr '_' '-').pem"
@@ -9,6 +10,7 @@ for i in $(env | grep -o KUBE_.*=); do
   value=$(echo "${!env}")
   if [ ! -f $SSL_CRTS_DIR/$name ] || [ "$FORCE_DEPLOY" = "true" ]; then
     echo "$value" > $SSL_CRTS_DIR/$name
+    chmod 600 $SSL_CRTS_DIR/$name
   fi
 done
 
@@ -18,5 +20,6 @@ for i in $(env | grep -o KUBECFG_.*=); do
   value=$(echo "${!env}")
   if [ ! -f $SSL_CRTS_DIR/$name ]; then
     echo "$value" > $SSL_CRTS_DIR/$name
+    chmod 600 $SSL_CRTS_DIR/$name
   fi
 done
