@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -96,6 +98,11 @@ var commonFlags = []cli.Flag{
 		Usage:  "Specify s3 bucket region",
 		EnvVar: "S3_BUCKET_REGION",
 	},
+	cli.StringFlag{
+		Name:   "s3-endpoint-ca",
+		Usage:  "Specify custom CA for S3 endpoint. Can be a file path or a base64 string",
+		EnvVar: "S3_ENDPOINT_CA",
+	},
 }
 
 type backupConfig struct {
@@ -105,6 +112,7 @@ type backupConfig struct {
 	SecretKey  string
 	BucketName string
 	Region     string
+	EndpointCA string
 }
 
 func init() {
@@ -242,21 +250,31 @@ func RollingBackupAction(c *cli.Context) error {
 		SecretKey:  c.String("s3-secretKey"),
 		BucketName: c.String("s3-bucketName"),
 		Region:     c.String("s3-region"),
+		EndpointCA: c.String("s3-endpoint-ca"),
 	}
 
-	client := &minio.Client{}
+	var client = &minio.Client{}
+	var tr = &http.Transport{}
+	var err error
 	if s3Backup {
-		svc, err := setS3Service(bc, true)
+		client, err = setS3Service(bc, true)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"s3-endpoint":   bc.Endpoint,
-				"s3-bucketName": bc.BucketName,
-				"s3-accessKey":  bc.AccessKey,
-				"s3-region":     bc.Region,
+				"s3-endpoint":    bc.Endpoint,
+				"s3-bucketName":  bc.BucketName,
+				"s3-accessKey":   bc.AccessKey,
+				"s3-region":      bc.Region,
+				"s3-endpoint-ca": bc.EndpointCA,
 			}).Errorf("failed to set s3 server: %s", err)
 			return fmt.Errorf("faield to set s3 server: %+v", err)
 		}
-		client = svc
+		if bc.EndpointCA != "" {
+			tr, err = getCustomCATransport(bc.EndpointCA)
+			if err != nil {
+				return err
+			}
+		}
+		client.SetCustomTransport(tr)
 	}
 
 	if c.Bool("once") {
@@ -481,8 +499,9 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 	// Initialize minio client object.
 	log.Info("invoking set s3 service client")
 	var err error
-	var svc = &minio.Client{}
+	var client = &minio.Client{}
 	var cred = &credentials.Credentials{}
+	var tr = &http.Transport{}
 	bucketLookup := getBucketLookupType(bc.Endpoint)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
 		// if the s3 access key and secret is not set use iam role
@@ -495,7 +514,7 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 		} else {
 			cred = credentials.NewStatic(bc.AccessKey, bc.SecretKey, "", credentials.SignatureDefault)
 		}
-		svc, err = minio.NewWithOptions(bc.Endpoint, &minio.Options{
+		client, err = minio.NewWithOptions(bc.Endpoint, &minio.Options{
 			Creds:        cred,
 			Secure:       useSSL,
 			Region:       bc.Region,
@@ -508,17 +527,25 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 			}
 			continue
 		}
+		if bc.EndpointCA != "" {
+			tr, err = getCustomCATransport(bc.EndpointCA)
+			if err != nil {
+				return nil, err
+			}
+		}
+		client.SetCustomTransport(tr)
+
 		break
 	}
 
-	found, err := svc.BucketExists(bc.BucketName)
+	found, err := client.BucketExists(bc.BucketName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check s3 bucket:%s, err:%v", bc.BucketName, err)
 	}
 	if !found {
 		return nil, fmt.Errorf("bucket %s is not found", bc.BucketName)
 	}
-	return svc, nil
+	return client, nil
 }
 
 func getBucketLookupType(endpoint string) minio.BucketLookupType {
@@ -565,19 +592,19 @@ func DownloadS3Backup(c *cli.Context) error {
 		SecretKey:  c.String("s3-secretKey"),
 		BucketName: c.String("s3-bucketName"),
 		Region:     c.String("s3-region"),
+		EndpointCA: c.String("s3-endpoint-ca"),
 	}
-
 	client, err := setS3Service(bc, true)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"s3-endpoint":   bc.Endpoint,
-			"s3-bucketName": bc.BucketName,
-			"s3-accessKey":  bc.AccessKey,
-			"s3-region":     bc.Region,
+			"s3-endpoint":    bc.Endpoint,
+			"s3-bucketName":  bc.BucketName,
+			"s3-accessKey":   bc.AccessKey,
+			"s3-region":      bc.Region,
+			"s3-endpoint-ca": bc.EndpointCA,
 		}).Errorf("failed to set s3 server: %s", err)
 		return fmt.Errorf("failed to set s3 server: %+v", err)
 	}
-
 	fileName := c.String("name")
 	compressedFileName := fmt.Sprintf("%s.%s", fileName, compressedExtension)
 	if len(fileName) == 0 {
@@ -605,7 +632,7 @@ func DownloadS3Backup(c *cli.Context) error {
 				fileLocation := fmt.Sprintf("%s/%s", backupBaseDir, fileName)
 				err := decompressFile(compressedFileLocation, fileLocation)
 				if err != nil {
-					return fmt.Errorf("Unable to decompress [%s] to [%s]", compressedFileLocation, fileLocation)
+					return fmt.Errorf("Unable to decompress [%s] to [%s]: %v", compressedFileLocation, fileLocation, err)
 				}
 				log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
 			}
@@ -856,4 +883,49 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	}
 	defer f.Close()
 	return ioutil.ReadAll(f)
+}
+
+func readS3EndpointCA(endpointCA string) ([]byte, error) {
+	// I expect the CA to be passed as base64 string OR a file system path.
+	// I do this to be able to pass it through rke/rancher api without writing it
+	// to the backup container filesystem.
+	ca, err := base64.StdEncoding.DecodeString(endpointCA)
+	if err == nil {
+		log.Debug("reading s3-endpoint-ca as a base64 string")
+	} else {
+		ca, err = ioutil.ReadFile(endpointCA)
+		log.Debugf("reading s3-endpoint-ca from [%v]", endpointCA)
+	}
+	return ca, err
+}
+
+func isValidCertificate(c []byte) bool {
+	p, _ := pem.Decode(c)
+	if p == nil {
+		return false
+	}
+	_, err := x509.ParseCertificates(p.Bytes)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func getCustomCATransport(endpointCA string) (*http.Transport, error) {
+	var tr = &http.Transport{}
+	ca, err := readS3EndpointCA(endpointCA)
+	if err != nil {
+		return nil, err
+	}
+	if !isValidCertificate(ca) {
+		return nil, fmt.Errorf("s3-endpoint-ca is not a valid x509 certificate")
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(ca)
+	tr = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+		},
+	}
+	return tr, nil
 }
