@@ -24,7 +24,7 @@ import (
 const (
 	backupBaseDir       = "/backup"
 	backupRetries       = 4
-	compressedExtension = "gz"
+	compressedExtension = "zip"
 	s3ServerRetries     = 3
 	contentType         = "application/zip"
 	ServerPort          = "2379"
@@ -445,7 +445,7 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 
 	isRecursive := false
 	objectCh := svc.ListObjects(bc.BucketName, "", isRecursive, doneCh)
-	re := regexp.MustCompile(".+_etcd(|.gz)$")
+	re := regexp.MustCompile(fmt.Sprintf(".+_etcd(|.%s)$", compressedExtension))
 	for object := range objectCh {
 		if object.Err != nil {
 			log.Error("error to fetch s3 file:", object.Err)
