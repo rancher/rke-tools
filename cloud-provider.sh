@@ -32,6 +32,10 @@ set_azure_config() {
     az_resources_group="$az_vm_resources_group"
   fi
 
+  if [ -z "$az_location" ]; then
+    az_location=$(curl  -s -H Metadata:true "${AZURE_META_URL}/location?api-version=2017-08-01&format=text")
+  fi
+
   local az_vm_nic=$(az vm nic list -g ${az_resources_group} --vm-name ${az_vm_name} | jq -r .[0].id | cut -d "/" -f 9)
 
   if [ -z "$az_subnet_name" ] ; then
