@@ -1,0 +1,29 @@
+image: rancher/rke-tools:{{build.tag}}
+manifests:
+  -
+    image: rancher/rke-tools:{{build.tag}}-linux-amd64
+    platform:
+      architecture: amd64
+      os: linux
+  -
+    image: rancher/rke-tools:{{build.tag}}-linux-arm64
+    platform:
+      architecture: arm64
+      os: linux
+  -
+    image: rancher/rke-tools:{{build.tag}}-linux-arm
+    platform:
+      architecture: arm
+      os: linux
+  -
+    image: rancher/rke-tools:{{build.tag}}-windows-1809
+    platform:
+      architecture: amd64
+      os: windows
+      version: 1809
+  -
+    image: rancher/rke-tools:{{build.tag}}-windows-1903
+    platform:
+      architecture: amd64
+      os: windows
+      version: 1903

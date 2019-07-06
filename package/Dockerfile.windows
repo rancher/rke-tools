@@ -1,0 +1,179 @@
+ARG SERVERCORE_VERSION
+
+FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} as builder-azure-cli
+SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+# download python
+ENV PYTHON_VERSION=3.6.5
+RUN $URL = ('https://www.python.org/ftp/python/{0}/python-{0}-amd64.exe' -f $env:PYTHON_VERSION); \
+    \
+    Write-Host ('Downloading python from {0} ...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\python-installer.exe -Uri $URL; \
+    \
+    Write-Host 'Installing ...'; \
+    Start-Process c:\python-installer.exe -NoNewWindow -Wait -ArgumentList '/quiet InstallAllUsers=1 TargetDir=c:\python PrependPath=1 Shortcuts=0 Include_doc=0 Include_pip=0 Include_test=0'; \
+    \
+    Write-Host 'Refresh local PATH ...'; \
+    $env:PATH = [Environment]::GetEnvironmentVariable('PATH', [EnvironmentVariableTarget]::Machine); \
+    \
+    Write-Host 'Verifying install ...'; \
+    Write-Host '  python --version'; python --version; \
+    \
+    Write-Host 'Complete.'
+# download pip
+ENV PYTHON_PIP_VERSION=19.1.1
+RUN $URL = 'https://bootstrap.pypa.io/get-pip.py'; \
+    \
+    Write-Host ('Downloading get-pip from {0} ...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\get-pip.py -Uri $URL; \
+    \
+    Write-Host 'Installing pip ...'; \
+    python c:\get-pip.py --disable-pip-version-check --no-cache-dir ('pip=={0}' -f $env:PYTHON_PIP_VERSION); \
+    \
+    Write-Host 'Verifying install ...'; \
+    Write-Host '  pip --version'; pip --version; \
+    \
+    Write-Host 'Complete.'
+# download azure-cli sources
+ENV AZURECLI_VERSION=2.0.69
+RUN $URL = ('https://github.com/Azure/azure-cli/archive/azure-cli-{0}.zip' -f $env:AZURECLI_VERSION); \
+    \
+    Write-Host ('Downloading azure-cli from {0} ...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\azure-cli.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\azure-cli.zip -DestinationPath c:\; \
+    Move-Item -Force -Path ('c:\azure-cli-azure-cli-{0}' -f $env:AZURECLI_VERSION) -Destination c:\azure-cli; \
+    \
+    Write-Host 'Complete.'
+# build azure-cli
+RUN pushd c:\azure-cli; \
+    Write-Host 'Building azure-cli...'; \
+    pip install wheel; \
+    \
+    Write-Host 'Building python packages...'; \
+    $wheels = Join-Path $pwd 'wheels'; \
+    $folder = @('src\azure-cli'); \
+    foreach($f in $folder) { \
+        try { \
+            pushd $f; \
+            python setup.py bdist_wheel -d $wheels; \
+        } \
+        finally { \
+            popd; \
+        } \
+    } \
+    \
+    Write-Host 'Installing python packages...'; \
+    pushd $wheels; \
+    $modules = (Get-ChildItem *.whl -Name); \
+    foreach($m in $modules) { \
+        pip install --no-cache-dir $m; \
+    } \
+    pip install --no-cache-dir --force-reinstall --upgrade azure-nspkg azure-mgmt-nspkg; \
+    popd; \
+    \
+    Write-Host 'Complete.'; \
+    popd
+# compress azure-cli
+RUN pushd c:\; \
+    Write-Host 'Compressing azure-cli...'; \
+    \
+    Remove-Item -Force -Path c:\azure-cli.zip -ErrorAction Ignore; \
+    Compress-Archive -Path c:\python -DestinationPath c:\azure-cli.zip; \
+    \
+    Write-Host 'Complete.'; \
+    popd
+
+FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} as builder
+ARG ARCH=amd64
+SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+# download confd
+RUN $URL = 'https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-windows-amd64.exe'; \
+    \
+    Write-Host ('Downloading confd from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\confd.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# download nginx
+RUN $URL = 'http://nginx.org/download/nginx-1.15.9.zip'; \
+    \
+    Write-Host ('Downloading nginx from {0} ...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\nginx.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\nginx.zip -DestinationPath c:\; \
+    \
+    Write-Host 'Complete.'
+# download cni plugins
+RUN $URL = 'https://github.com/thxCode/containernetworking-plugins/releases/download/v0.2.1-rancher/binaries.zip'; \
+    \
+    Write-Host ('Downloading cni plugins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\containernetworking-plugins.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\containernetworking-plugins.zip -DestinationPath c:\containernetworking\.; \
+    \
+    Write-Host 'Complete.'
+# download flanneld
+RUN $URL = 'https://github.com/thxCode/coreos-flannel/releases/download/v0.2.0-rancher/binaries.zip'; \
+    \
+    Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\flanneld.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\flanneld.zip -DestinationPath c:\flanneld\.; \
+    \
+    Write-Host 'Complete.'
+# download flexvolume plugins
+RUN $URL = 'https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip'; \
+    \
+    Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\flexvolume.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\flexvolume.zip -DestinationPath c:\flexvolume\.; \
+    \
+    Write-Host 'Complete.'
+# download wins
+RUN $URL = 'https://github.com/thxCode/wins/releases/download/v0.0.11/wins.exe'; \
+    \
+    Write-Host ('Downloading wins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\wins.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# download GetGcePdName.dll
+# this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
+RUN $URL = 'https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll'; \
+    \
+    Write-Host ('Downloading GetGcePdName DLL from {0}...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\GetGcePdName.dll -Uri $URL; \
+    \
+    Write-Host 'Complete.';
+
+FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
+USER ContainerAdministrator
+COPY --from=builder /Windows/System32/netapi32.dll /Windows/System32/
+COPY --from=builder /wins.exe /confd.exe /Windows/
+COPY --from=builder /nginx-1.15.9 /etc/nginx
+COPY --from=builder /containernetworking/bin/host-local.exe /containernetworking/bin/flannel.exe /containernetworking/bin/win-overlay.exe /containernetworking/bin/win-bridge.exe /opt/cni/bin/
+COPY --from=builder /flanneld/dist/flanneld.exe /opt/bin/
+COPY --from=builder /flexvolume /share/kubelet-volumeplugins
+COPY --from=builder /GetGcePdName.dll /share/gce-patch/
+COPY --from=builder-azure-cli /azure-cli.zip /share/azure-cli.zip
+COPY windows/templates /etc/confd/templates/
+COPY windows/conf.d /etc/confd/conf.d/
+COPY windows/sidecar.ps1 windows/nginx-proxy.ps1 windows/cert-deployer.ps1 windows/utils.psm1 /usr/bin/
+COPY windows/entrypoint.ps1 windows/cloud-provider.psm1 windows/utils.psm1 /share/scripts/
+VOLUME c:/opt/rke-tools
+VOLUME c:/run
+ENTRYPOINT ["pwsh.exe", "-NoLogo"]
