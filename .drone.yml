@@ -1,5 +1,5 @@
 kind: pipeline
-name: amd64
+name: linux-amd64
 
 platform:
   os: linux
@@ -36,7 +36,7 @@ steps:
       build_args:
         - ARCH=amd64
       repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-amd64"
+      tag: "${DRONE_TAG}-linux-amd64"
     when:
       instance:
       - drone-publish.rancher.io
@@ -51,7 +51,7 @@ volumes:
       path: /var/run/docker.sock
 ---
 kind: pipeline
-name: arm64
+name: linux-arm64
 
 platform:
   os: linux
@@ -88,7 +88,7 @@ steps:
       build_args:
         - ARCH=arm64
       repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-arm64"
+      tag: "${DRONE_TAG}-linux-arm64"
     when:
       instance:
       - drone-publish.rancher.io
@@ -103,21 +103,92 @@ volumes:
       path: /var/run/docker.sock
 ---
 kind: pipeline
-name: manifest
+name: windows-1809
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1809
 
 steps:
-  - name: push-manifest
-    image: plugins/manifest:1.0.2
+  - name: publish-rke-tools-windows-1809
+    image: plugins/docker
     settings:
       username:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      target: "rancher/rke-tools:${DRONE_TAG}"
-      template: "rancher/rke-tools:${DRONE_TAG}-ARCH"
-      platforms:
-        - linux/amd64
-        - linux/arm64
+      dockerfile: package/Dockerfile.windows
+      build_args:
+        - SERVERCORE_VERSION=1809
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-windows-1809"
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+---
+kind: pipeline
+name: windows-1903
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1903
+
+steps:
+  - name: publish-rke-tools-windows-1903
+    image: plugins/docker
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      dockerfile: package/Dockerfile.windows
+      build_args:
+        - SERVERCORE_VERSION=1903
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-windows-1903"
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+      - drone-publish.rancher.io
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+---
+kind: pipeline
+name: manifest
+
+steps:
+  - name: push-manifest
+    image: plugins/manifest:1.1.0
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      spec: manifest.tmpl
+      ignore_missing: true
     when:
       instance:
       - drone-publish.rancher.io
@@ -127,5 +198,7 @@ steps:
       event:
       - tag
 depends_on:
-- amd64
-- arm64
+- linux-amd64
+- linux-arm64
+- windows-1809
+- windows-1903

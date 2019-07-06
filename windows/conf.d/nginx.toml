@@ -1,0 +1,6 @@
+[template]
+src = "nginx.tmpl"
+dest = "c:/host/etc/nginx/conf/nginx.conf"
+keys = [
+    "CP_HOSTS",
+]
