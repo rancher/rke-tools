@@ -381,6 +381,14 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			"runtime": endTime.Sub(startTime),
 		}).Info("Created backup")
 
+		if err := os.Chmod(compressedFilePath, 0600); err != nil {
+			log.WithFields(log.Fields{
+				"attempt": retries + 1,
+				"error":   err,
+				"data":    string(data),
+			}).Warn("changing permission of the compressed snapshot failed")
+		}
+
 		if server.Backup {
 			err = uploadBackupFile(svc, server.BucketName, compressedFile, compressedFilePath)
 			if err == nil {
@@ -636,6 +644,11 @@ func DownloadS3Backup(c *cli.Context) error {
 				}
 				log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
 			}
+			if err := os.Chmod(compressedFileLocation, 0600); err != nil {
+				log.WithFields(log.Fields{
+					"error": err,
+				}).Warn("changing permission of the compressed snapshot failed")
+			}
 			return nil
 		}
 	}
@@ -683,6 +696,12 @@ func DownloadLocalBackup(c *cli.Context) error {
 
 	if _, err := io.Copy(snapshotFile, resp.Body); err != nil {
 		return err
+	}
+
+	if err := os.Chmod(snapshotFileLocation, 0600); err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Warn("changing permission of the locally downloaded snapshot failed")
 	}
 
 	log.Infof("Successfully download %s from %s ", snapshot, endpoint)
