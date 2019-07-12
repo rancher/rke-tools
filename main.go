@@ -279,9 +279,6 @@ func RollingBackupAction(c *cli.Context) error {
 
 	if c.Bool("once") {
 		backupName := c.String("name")
-		if len(backupName) == 0 {
-			backupName = fmt.Sprintf("%s_etcd", time.Now().Format(time.RFC3339))
-		}
 		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
 			return err
 		}
@@ -613,46 +610,27 @@ func DownloadS3Backup(c *cli.Context) error {
 		}).Errorf("failed to set s3 server: %s", err)
 		return fmt.Errorf("failed to set s3 server: %+v", err)
 	}
-	fileName := c.String("name")
-	compressedFileName := fmt.Sprintf("%s.%s", fileName, compressedExtension)
-	if len(fileName) == 0 {
-		return fmt.Errorf("empty file name")
+
+	prefix := c.String("name")
+	if len(prefix) == 0 {
+		return fmt.Errorf("empty backup name")
 	}
-	// Check for both filenames (not compressed for backwards compatibility)
-	fileNameOptions := [2]string{compressedFileName, fileName}
-	for _, fileNameOption := range fileNameOptions {
-		log.Infof("Trying to download etcd snapshot file [%s] from endpoint [%s] and bucket [%s]", fileNameOption, bc.Endpoint, bc.BucketName)
-		for retries := 0; retries <= s3ServerRetries; retries++ {
-			err := client.FGetObject(bc.BucketName, fileNameOption, backupBaseDir+"/"+fileNameOption, minio.GetObjectOptions{})
-			if err != nil {
-				log.Infof("Failed to download etcd snapshot file [%s]: %v, retried %d times", fileNameOption, err, retries)
-				if retries >= s3ServerRetries {
-					log.Warningf("Failed to download etcd snapshot file [%s]: %v", fileNameOption, err)
-					break
-				}
-				continue
-			}
-			log.Infof("Successfully downloaded [%s]", fileNameOption)
-			compressedFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, compressedFileName)
-			// Check if snapshot is compressed
-			if strings.EqualFold(fileNameOption, compressedFileName) {
-				log.Infof("Decompressing etcd snapshot file [%s]", fileNameOption)
-				fileLocation := fmt.Sprintf("%s/%s", backupBaseDir, fileName)
-				err := decompressFile(compressedFileLocation, fileLocation)
-				if err != nil {
-					return fmt.Errorf("Unable to decompress [%s] to [%s]: %v", compressedFileLocation, fileLocation, err)
-				}
-				log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
-			}
-			if err := os.Chmod(compressedFileLocation, 0600); err != nil {
-				log.WithFields(log.Fields{
-					"error": err,
-				}).Warn("changing permission of the compressed snapshot failed")
-			}
-			return nil
+
+	filename, err := downloadFromS3WithPrefix(client, prefix, bc.BucketName)
+	if err != nil {
+		return err
+	}
+	if isCompressed(filename) {
+		log.Infof("Decompressing etcd snapshot file [%s]", filename)
+		compressedFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, filename)
+		fileLocation := fmt.Sprintf("%s/%s", backupBaseDir, decompressedName(filename))
+		err := decompressFile(compressedFileLocation, fileLocation)
+		if err != nil {
+			return fmt.Errorf("Unable to decompress [%s] to [%s]: %v", compressedFileLocation, fileLocation, err)
 		}
+		log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
 	}
-	return fmt.Errorf("Unable to download backup file for [%s]", fileName)
+	return nil
 }
 
 func DownloadLocalBackup(c *cli.Context) error {
@@ -824,6 +802,43 @@ func IsRecurringSnapshot(name string) bool {
 	return re.MatchString(name)
 }
 
+func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (string, error) {
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	s3BackupsList := []string{}
+	objectCh := client.ListObjectsV2(bucket, prefix, false, doneCh)
+
+	for object := range objectCh {
+		if object.Err != nil {
+			log.Error("failed to list objects in backup buckets [%s]:", bucket, object.Err)
+			return "", object.Err
+		}
+		// doing this instead of len(objectCh) to be able to print backups
+		s3BackupsList = append(s3BackupsList, object.Key)
+	}
+	if len(s3BackupsList) > 1 {
+		return "", fmt.Errorf("failed to download s3 backup: found multiple backups with the same name: %v", s3BackupsList)
+	}
+	if len(s3BackupsList) == 0 {
+		return "", fmt.Errorf("failed to download s3 backup: no backups found")
+	}
+	// should be one and only one backup
+	filename := s3BackupsList[0]
+	for retries := 0; retries <= s3ServerRetries; retries++ {
+		err := client.FGetObject(bucket, filename, backupBaseDir+"/"+filename, minio.GetObjectOptions{})
+		if err != nil {
+			log.Infof("Failed to download etcd snapshot file [%s]: %v, retried %d times", filename, err, retries)
+			if retries >= s3ServerRetries {
+				log.Warningf("Failed to download etcd snapshot file [%s]: %v", filename, err)
+				break
+			}
+		}
+		log.Infof("Successfully downloaded [%s]", filename)
+		return filename, nil
+	}
+	return "", fmt.Errorf("Unable to download backup file for [%s]", filename)
+}
+
 func compressFile(fileName string) (string, error) {
 	// Check if source file exists
 	fileToZip, err := os.Open(fileName)
@@ -947,4 +962,12 @@ func getCustomCATransport(endpointCA string) (*http.Transport, error) {
 		},
 	}
 	return tr, nil
+}
+
+func isCompressed(filename string) bool {
+	return strings.HasSuffix(filename, fmt.Sprintf(".%s", compressedExtension))
+}
+
+func decompressedName(filename string) string {
+	return strings.TrimSuffix(filename, path.Ext(filename))
 }
