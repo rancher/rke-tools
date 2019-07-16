@@ -254,7 +254,7 @@ func RollingBackupAction(c *cli.Context) error {
 	}
 
 	var client = &minio.Client{}
-	var tr = &http.Transport{}
+	var tr = http.DefaultTransport
 	var err error
 	if s3Backup {
 		client, err = setS3Service(bc, true)
@@ -269,7 +269,7 @@ func RollingBackupAction(c *cli.Context) error {
 			return fmt.Errorf("faield to set s3 server: %+v", err)
 		}
 		if bc.EndpointCA != "" {
-			tr, err = getCustomCATransport(bc.EndpointCA)
+			tr, err = setTransportCA(tr, bc.EndpointCA)
 			if err != nil {
 				return err
 			}
@@ -509,7 +509,7 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 	var err error
 	var client = &minio.Client{}
 	var cred = &credentials.Credentials{}
-	var tr = &http.Transport{}
+	var tr = http.DefaultTransport
 	bucketLookup := getBucketLookupType(bc.Endpoint)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
 		// if the s3 access key and secret is not set use iam role
@@ -536,7 +536,7 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 			continue
 		}
 		if bc.EndpointCA != "" {
-			tr, err = getCustomCATransport(bc.EndpointCA)
+			tr, err = setTransportCA(tr, bc.EndpointCA)
 			if err != nil {
 				return nil, err
 			}
@@ -930,21 +930,20 @@ func isValidCertificate(c []byte) bool {
 	return true
 }
 
-func getCustomCATransport(endpointCA string) (*http.Transport, error) {
-	var tr = &http.Transport{}
+func setTransportCA(tr http.RoundTripper, endpointCA string) (http.RoundTripper, error) {
 	ca, err := readS3EndpointCA(endpointCA)
 	if err != nil {
-		return nil, err
+		return tr, err
 	}
 	if !isValidCertificate(ca) {
-		return nil, fmt.Errorf("s3-endpoint-ca is not a valid x509 certificate")
+		return tr, fmt.Errorf("s3-endpoint-ca is not a valid x509 certificate")
 	}
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(ca)
-	tr = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
+
+	tr.(*http.Transport).TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
 	}
+
 	return tr, nil
 }
