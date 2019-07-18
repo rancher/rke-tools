@@ -103,6 +103,11 @@ var commonFlags = []cli.Flag{
 		Usage:  "Specify custom CA for S3 endpoint. Can be a file path or a base64 string",
 		EnvVar: "S3_ENDPOINT_CA",
 	},
+	cli.StringFlag{
+		Name:   "s3-folder",
+		Usage:  "Specify folder for snapshots",
+		EnvVar: "S3_FOLDER",
+	},
 }
 
 type backupConfig struct {
@@ -113,6 +118,7 @@ type backupConfig struct {
 	BucketName string
 	Region     string
 	EndpointCA string
+	Folder     string
 }
 
 func init() {
@@ -251,6 +257,7 @@ func RollingBackupAction(c *cli.Context) error {
 		BucketName: c.String("s3-bucketName"),
 		Region:     c.String("s3-region"),
 		EndpointCA: c.String("s3-endpoint-ca"),
+		Folder:     c.String("s3-folder"),
 	}
 
 	var client = &minio.Client{}
@@ -265,8 +272,9 @@ func RollingBackupAction(c *cli.Context) error {
 				"s3-accessKey":   bc.AccessKey,
 				"s3-region":      bc.Region,
 				"s3-endpoint-ca": bc.EndpointCA,
+				"s3-folder":      bc.Folder,
 			}).Errorf("failed to set s3 server: %s", err)
-			return fmt.Errorf("faield to set s3 server: %+v", err)
+			return fmt.Errorf("failed to set s3 server: %+v", err)
 		}
 		if bc.EndpointCA != "" {
 			tr, err = setTransportCA(tr, bc.EndpointCA)
@@ -387,6 +395,10 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		}
 
 		if server.Backup {
+			// If folder is specified, prefix the file with the folder
+			if len(server.Folder) != 0 {
+				compressedFile = fmt.Sprintf("%s/%s", server.Folder, compressedFile)
+			}
 			err = uploadBackupFile(svc, server.BucketName, compressedFile, compressedFilePath)
 			if err == nil {
 				return nil
@@ -467,7 +479,11 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 	defer close(doneCh)
 
 	isRecursive := false
-	objectCh := svc.ListObjects(bc.BucketName, "", isRecursive, doneCh)
+	prefix := ""
+	if len(bc.Folder) != 0 {
+		prefix = bc.Folder
+	}
+	objectCh := svc.ListObjects(bc.BucketName, prefix, isRecursive, doneCh)
 	re := regexp.MustCompile(fmt.Sprintf(".+_etcd(|.%s)$", compressedExtension))
 	for object := range objectCh {
 		if object.Err != nil {
@@ -598,6 +614,7 @@ func DownloadS3Backup(c *cli.Context) error {
 		BucketName: c.String("s3-bucketName"),
 		Region:     c.String("s3-region"),
 		EndpointCA: c.String("s3-endpoint-ca"),
+		Folder:     c.String("s3-folder"),
 	}
 	client, err := setS3Service(bc, true)
 	if err != nil {
@@ -607,6 +624,7 @@ func DownloadS3Backup(c *cli.Context) error {
 			"s3-accessKey":   bc.AccessKey,
 			"s3-region":      bc.Region,
 			"s3-endpoint-ca": bc.EndpointCA,
+			"s3-folder":      bc.Folder,
 		}).Errorf("failed to set s3 server: %s", err)
 		return fmt.Errorf("failed to set s3 server: %+v", err)
 	}
@@ -614,6 +632,10 @@ func DownloadS3Backup(c *cli.Context) error {
 	prefix := c.String("name")
 	if len(prefix) == 0 {
 		return fmt.Errorf("empty backup name")
+	}
+	folder := c.String("s3-folder")
+	if len(folder) != 0 {
+		prefix = fmt.Sprintf("%s/%s", folder, prefix)
 	}
 
 	filename, err := downloadFromS3WithPrefix(client, prefix, bc.BucketName)
@@ -627,6 +649,11 @@ func DownloadS3Backup(c *cli.Context) error {
 		err := decompressFile(compressedFileLocation, fileLocation)
 		if err != nil {
 			return fmt.Errorf("Unable to decompress [%s] to [%s]: %v", compressedFileLocation, fileLocation, err)
+		}
+		if err := os.Chmod(fileLocation, 0600); err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Warn("changing permission of the decompressed snapshot failed")
 		}
 		log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
 	}
@@ -824,8 +851,10 @@ func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (stri
 	}
 	// should be one and only one backup
 	filename := s3BackupsList[0]
+	// if folder is included, strip it so it doesnt end up in a folder on the host itself
+	targetFilename := path.Base(filename)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
-		err := client.FGetObject(bucket, filename, backupBaseDir+"/"+filename, minio.GetObjectOptions{})
+		err := client.FGetObject(bucket, filename, backupBaseDir+"/"+targetFilename, minio.GetObjectOptions{})
 		if err != nil {
 			log.Infof("Failed to download etcd snapshot file [%s]: %v, retried %d times", filename, err, retries)
 			if retries >= s3ServerRetries {
@@ -834,7 +863,7 @@ func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (stri
 			}
 		}
 		log.Infof("Successfully downloaded [%s]", filename)
-		return filename, nil
+		return targetFilename, nil
 	}
 	return "", fmt.Errorf("Unable to download backup file for [%s]", filename)
 }
