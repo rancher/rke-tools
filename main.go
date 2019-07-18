@@ -316,7 +316,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		}
 		// check if the cluster is healthy
 		cmd := exec.Command("etcdctl",
-			fmt.Sprintf("--endpoints=[%s]", endpoints),
+			fmt.Sprintf("--endpoints=%s", endpoints),
 			"--cacert="+etcdCACert,
 			"--cert="+etcdCert,
 			"--key="+etcdKey,
@@ -332,7 +332,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		}
 
 		cmd = exec.Command("etcdctl",
-			fmt.Sprintf("--endpoints=[%s]", endpoints),
+			fmt.Sprintf("--endpoints=%s", endpoints),
 			"--cacert="+etcdCACert,
 			"--cert="+etcdCert,
 			"--key="+etcdKey,
