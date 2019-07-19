@@ -637,7 +637,7 @@ func DownloadS3Backup(c *cli.Context) error {
 	if len(folder) != 0 {
 		prefix = fmt.Sprintf("%s/%s", folder, prefix)
 	}
-
+	// we need download with prefix because we don't know if the file is ziped or not
 	filename, err := downloadFromS3WithPrefix(client, prefix, bc.BucketName)
 	if err != nil {
 		return err
@@ -830,27 +830,24 @@ func IsRecurringSnapshot(name string) bool {
 }
 
 func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (string, error) {
+	var filename string
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	s3BackupsList := []string{}
-	objectCh := client.ListObjectsV2(bucket, prefix, false, doneCh)
 
+	objectCh := client.ListObjectsV2(bucket, prefix, false, doneCh)
 	for object := range objectCh {
 		if object.Err != nil {
 			log.Error("failed to list objects in backup buckets [%s]:", bucket, object.Err)
 			return "", object.Err
 		}
-		// doing this instead of len(objectCh) to be able to print backups
-		s3BackupsList = append(s3BackupsList, object.Key)
+		if prefix == decompressedName(object.Key) {
+			filename = object.Key
+			break
+		}
 	}
-	if len(s3BackupsList) > 1 {
-		return "", fmt.Errorf("failed to download s3 backup: found multiple backups with the same name: %v", s3BackupsList)
-	}
-	if len(s3BackupsList) == 0 {
+	if len(filename) == 0 {
 		return "", fmt.Errorf("failed to download s3 backup: no backups found")
 	}
-	// should be one and only one backup
-	filename := s3BackupsList[0]
 	// if folder is included, strip it so it doesnt end up in a folder on the host itself
 	targetFilename := path.Base(filename)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
