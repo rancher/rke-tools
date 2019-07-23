@@ -23,3 +23,13 @@ for i in $(env | grep -o KUBECFG_.*=); do
     chmod 600 $SSL_CRTS_DIR/$name
   fi
 done
+
+# only enabled if we are running etcd with custom uid/gid
+if [ -n "${ETCD_UID}" ] && [ -n "${ETCD_GID}" ]; then
+  # set minial mask to allow effective read access to the certificates
+  setfacl -R -m m::rX "${SSL_CRTS_DIR}" && echo "Successfully set ACL mask for certs dir"
+  # allow certs dir read access to the custom etcd uid
+  setfacl -R -m u:${ETCD_UID}:rX "${SSL_CRTS_DIR}" && echo "Successfully set user ACL for certs dir"
+  # allow certs dir read access to the custom etcd gid
+  setfacl -R -m g:${ETCD_GID}:rX "${SSL_CRTS_DIR}" && echo "Successfully set group ACL for certs dir"
+fi
