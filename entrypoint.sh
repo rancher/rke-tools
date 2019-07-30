@@ -1,10 +1,14 @@
-#!/bin/bash -x
+#!/bin/bash
+
+set -x
 
 # generate Azure cloud provider config
 if echo ${@} | grep -q "cloud-provider=azure"; then
   if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
     source /opt/rke-tools/cloud-provider.sh
     set_azure_config
+    # If set_azure_config is called debug needs to be turned back on
+    set -x
   fi
 fi
 

@@ -4,6 +4,7 @@ AZURE_META_URL="http://169.254.169.254/metadata/instance/compute"
 AZURE_CLOUD_CONFIG_PATH="/etc/kubernetes/cloud-config"
 
 set_azure_config() {
+  set +x
   local az_resources_group=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .resourceGroup)
   local az_subscription_id=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .subscriptionId)
   local az_location=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .location)
