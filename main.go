@@ -650,11 +650,7 @@ func DownloadS3Backup(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("Unable to decompress [%s] to [%s]: %v", compressedFileLocation, fileLocation, err)
 		}
-		if err := os.Chmod(fileLocation, 0600); err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Warn("changing permission of the decompressed snapshot failed")
-		}
+
 		log.Infof("Decompressed [%s] to [%s]", compressedFileLocation, fileLocation)
 	}
 	return nil
@@ -933,6 +929,13 @@ func decompressFile(src string, dest string) error {
 			return err
 		}
 	}
+
+	if err := os.Chmod(dest, 0600); err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Warn("changing permission of the decompressed snapshot failed")
+	}
+
 	return nil
 }
 
