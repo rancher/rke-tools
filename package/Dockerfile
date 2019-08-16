@@ -12,7 +12,7 @@ RUN apk -U --no-cache add bash curl wget ca-certificates tar sysstat\
 RUN mkdir -p /opt/cni/bin
 RUN wget -q -O - https://github.com/containernetworking/cni/releases/download/v0.4.0/cni-amd64-v0.4.0.tgz | tar xzf - -C /tmp
 
-RUN wget -q -O - https://github.com/coreos/etcd/releases/download/v3.0.17/etcd-v3.0.17-linux-amd64.tar.gz | tar xzf - -C /tmp && \
+RUN wget -q -O - https://github.com/etcd-io/etcd/releases/download/v3.0.17/etcd-v3.0.17-linux-amd64.tar.gz | tar xzf - -C /tmp && \
     mv /tmp/etcd-*/etcdctl /usr/local/bin/etcdctl && \
     rm -rf /tmp/etcd-* && rm -f /etcd-*.tar.gz && \
     apk del wget
