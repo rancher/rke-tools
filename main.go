@@ -837,7 +837,7 @@ func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (stri
 	objectCh := client.ListObjectsV2(bucket, prefix, false, doneCh)
 	for object := range objectCh {
 		if object.Err != nil {
-			log.Error("failed to list objects in backup buckets [%s]:", bucket, object.Err)
+			log.Errorf("failed to list objects in backup buckets [%s]: %v", bucket, object.Err)
 			return "", object.Err
 		}
 		if prefix == decompressedName(object.Key) {
