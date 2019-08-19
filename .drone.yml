@@ -13,6 +13,10 @@ steps:
         path: /var/run/docker.sock
     commands:
       - dapper ci
+  - name: run-binary
+    image: rancher/dapper:v0.4.1
+    commands:
+      - ./bin/rke-etcd-backup --help
   - name: stage-binaries
     image: rancher/dapper:v0.4.1
     commands:
