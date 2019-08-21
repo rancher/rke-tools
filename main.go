@@ -135,7 +135,7 @@ func main() {
 	app.Name = "Etcd Wrapper"
 	app.Usage = "Utility services for Etcd cluster backup"
 	app.Commands = []cli.Command{
-		RollingBackupCommand(),
+		BackupCommand(),
 	}
 	err = app.Run(os.Args)
 	if err != nil {
@@ -143,7 +143,7 @@ func main() {
 	}
 }
 
-func RollingBackupCommand() cli.Command {
+func BackupCommand() cli.Command {
 
 	snapshotFlags := []cli.Flag{
 		cli.DurationFlag{
@@ -172,7 +172,7 @@ func RollingBackupCommand() cli.Command {
 				Name:   "save",
 				Usage:  "Take snapshot on all etcd hosts and backup to s3 compatible storage",
 				Flags:  snapshotFlags,
-				Action: RollingBackupAction,
+				Action: SaveBackupAction,
 			},
 			{
 				Name:   "download",
@@ -218,7 +218,7 @@ func SetLoggingLevel(debug bool) {
 	}
 }
 
-func RollingBackupAction(c *cli.Context) error {
+func SaveBackupAction(c *cli.Context) error {
 	SetLoggingLevel(c.Bool("debug"))
 
 	creationPeriod := c.Duration("creation")
@@ -244,10 +244,6 @@ func RollingBackupAction(c *cli.Context) error {
 		return fmt.Errorf("Failed to find etcd cert or key paths")
 	}
 
-	log.WithFields(log.Fields{
-		"creation":  creationPeriod,
-		"retention": retentionPeriod,
-	}).Info("Initializing Rolling Backups")
 	s3Backup := c.Bool("s3-backup")
 	bc := &backupConfig{
 		Backup:     s3Backup,
@@ -287,6 +283,11 @@ func RollingBackupAction(c *cli.Context) error {
 
 	if c.Bool("once") {
 		backupName := c.String("name")
+
+		log.WithFields(log.Fields{
+			"name":          backupName,
+		}).Info("Initializing Onetime Backup")
+
 		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
 			return err
 		}
@@ -299,6 +300,11 @@ func RollingBackupAction(c *cli.Context) error {
 		}
 		return nil
 	}
+	log.WithFields(log.Fields{
+		"creation":  creationPeriod,
+		"retention": retentionPeriod,
+	}).Info("Initializing Rolling Backups")
+
 	backupTicker := time.NewTicker(creationPeriod)
 	for {
 		select {
@@ -318,6 +324,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 	failureInterval := 15 * time.Second
 	backupDir := fmt.Sprintf("%s/%s", backupBaseDir, backupName)
 	var err error
+	var data []byte
 	for retries := 0; retries <= backupRetries; retries++ {
 		if retries > 0 {
 			time.Sleep(failureInterval)
@@ -329,7 +336,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			"--cert="+etcdCert,
 			"--key="+etcdKey,
 			"endpoint", "health")
-		data, err := cmd.CombinedOutput()
+		data, err = cmd.CombinedOutput()
 
 		if strings.Contains(string(data), "unhealthy") {
 			log.WithFields(log.Fields{
@@ -405,6 +412,10 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			}
 		}
 		break
+	}
+	// Include the cmd output (data) into the error
+	if err != nil {
+		return fmt.Errorf("%s: %v", err, string(data))
 	}
 	return err
 }
