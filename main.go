@@ -285,7 +285,7 @@ func SaveBackupAction(c *cli.Context) error {
 		backupName := c.String("name")
 
 		log.WithFields(log.Fields{
-			"name":          backupName,
+			"name": backupName,
 		}).Info("Initializing Onetime Backup")
 
 		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
