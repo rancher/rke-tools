@@ -90,7 +90,6 @@ function Complete-AzureCloudConfig
 
         # override
         $azCloudConfigOverrided = @{
-            cloud = $azureCloud
             subscriptionId = $azSubscriptionId
             location = $azLocation
             resourceGroup = $azResourcesGroup
