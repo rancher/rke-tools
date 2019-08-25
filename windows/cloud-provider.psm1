@@ -13,7 +13,7 @@ function Complete-AzureCloudConfig
     try
     {
         # refresh local PATH
-        $env:PATH = "c:\opt\rke-tools\azure-cli\python\;c:\opt\rke-tools\azure-cli\python\Scripts\;$($env:PATH)"
+        $env:PATH = "c:\azure-cli\python\;c:\azure-cli\python\Scripts\;$($env:PATH)"
 
         # gain user configruation
         $azCloudConfig = Get-Content -Raw -Path $CloudConfigPath | ConvertTo-JsonObj

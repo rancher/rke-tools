@@ -17,11 +17,6 @@ try {
     if (-not (Test-Path -PathType Leaf -Path "c:\opt\rke-tools\entrypoint.ps1")) {
         # put cloud provider tools
         switch ($env:RKE_CLOUD_PROVIDER_NAME) {
-            "azure" {
-                # expand azure-cli.zip to c:\opt\rke-tools\azure-cli
-                Log-Info "Expanding azure cli package ..."
-                Expand-Archive -Force -Path "c:\share\azure-cli.zip" -DestinationPath "c:\opt\rke-tools\azure-cli" | Out-Null
-            }
             "gce" {
                 # put GetGcePdName.dll to c:\opt\rke-tools\gce-patch
                 Log-Info "Patching GetGcePdName.dll ..."
