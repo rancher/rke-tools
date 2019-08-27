@@ -247,7 +247,7 @@ switch ($command)
 
             # create source virtual IP
             $subnet = $hnsNetworkObj.Subnets[0].AddressCIDR
-            $sourceVip = $subnet.substring(0, $subnet.lastIndexOf(".")) + ".2"
+            $sourceVip = $subnet.substring(0, $subnet.lastIndexOf(".")) + ".254"
             $prcArgs += @(
                 "--source-vip=$sourceVip"
             )
