@@ -121,10 +121,10 @@ if ($networkConfigObj)
                 }
                 "host-gw" {
                     $networkAddress = ""
-                    if ($nodeAddress)  {
-                        $networkAddress = $nodeAddress
-                    } elseif ($nodeInternalAddress) {
+                    if ($nodeInternalAddress) {
                         $networkAddress = $nodeInternalAddress
+                    } elseif ($nodeAddress)  {
+                        $networkAddress = $nodeAddress
                     }
 
                     $networkMetadataJSON = wins.exe cli net get --address "$networkAddress"

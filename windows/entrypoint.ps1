@@ -221,6 +221,30 @@ switch ($command)
             Log-Warn "Could not put private registry Docker configuration to the host: $($_.Exception.Message)"
         }
 
+        # patch the internal address into --node-ip
+        # also indicate the default network adapter as the node IP if internal address is blank
+        if (-not [string]::IsNullOrEmpty($env:RKE_NODE_INTERNAL_ADDRESS)) {
+            $internalAddress = $env:RKE_NODE_INTERNAL_ADDRESS
+            $prcArgs += @(
+                "--node-ip=$internalAddress"
+            )
+        } else {
+            $getAdapterJson = wins.exe cli net get
+            if ($?) {
+                $defaultNetwork = $getAdapterJson | ConvertTo-JsonObj
+                if ($defaultNetwork) {
+                    $defaultNetworkAddress = $defaultNetwork.AddressCIDR -replace "/32",""
+                    $prcArgs += @(
+                        "--node-ip=$defaultNetworkAddress"
+                    )
+                } else {
+                    Log-Warn "Could not convert '$getAdapterJson' to json object"
+                }
+            } else {
+                Log-Warn "Could not get host network metadata: $getAdapterJson"
+            }
+        }
+
         $prcPath = "c:\etc\kubernetes\bin\kubelet.exe"
         $prcExposes = "TCP:10250"
     }
