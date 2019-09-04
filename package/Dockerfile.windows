@@ -84,8 +84,8 @@ COPY --from=builder /flexvolume /share/kubelet-volumeplugins
 COPY --from=builder /GetGcePdName.dll /share/gce-patch/
 COPY windows/templates /etc/confd/templates/
 COPY windows/conf.d /etc/confd/conf.d/
-COPY windows/sidecar.ps1 windows/nginx-proxy.ps1 windows/cert-deployer.ps1 windows/utils.psm1 /usr/bin/
-COPY windows/entrypoint.ps1 windows/cloud-provider.psm1 windows/utils.psm1 /share/scripts/
+COPY windows/sidecar.ps1 windows/nginx-proxy.ps1 windows/cert-deployer.ps1 windows/*.psm1 /usr/bin/
+COPY windows/entrypoint.ps1 windows/*.psm1 /share/scripts/
 VOLUME c:/opt/rke-tools
 VOLUME c:/run
 ENTRYPOINT ["pwsh.exe", "-NoLogo"]

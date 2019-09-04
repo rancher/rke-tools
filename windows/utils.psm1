@@ -85,6 +85,39 @@ function Exist-File
     return $false
 }
 
+function Ensure-NodeAddress
+{
+    param(
+        [parameter(Mandatory = $false)] $Address = "",
+        [parameter(Mandatory = $false)] $InternalAddress = ""
+    )
+
+    if (-not [string]::IsNullOrEmpty($InternalAddress)) {
+        if ($InternalAddress -ne $Address) {
+            return $InternalAddress
+        }
+
+        # if they are the same address, we need to verify that does the internal address correspond to a real network interface?
+        $null = wins.exe cli net get --address "$InternalAddress"
+        if ($?) {
+            return $InternalAddress
+        }
+
+        # else we try to return the default network interface
+        $defaultAdapterJson = wins.exe cli net get
+        if ($?) {
+            $defaultNetwork = $defaultAdapterJson | ConvertTo-JsonObj
+            if ($defaultNetwork) {
+                return ($defaultNetwork.AddressCIDR -replace "/32","")
+            }
+        }
+
+        return $InternalAddress
+    }
+
+    return $Address
+}
+
 Export-ModuleMember -Function Log-Info
 Export-ModuleMember -Function Log-Warn
 Export-ModuleMember -Function Log-Error
@@ -92,3 +125,4 @@ Export-ModuleMember -Function Log-Fatal
 Export-ModuleMember -Function ConvertTo-JsonObj
 Export-ModuleMember -Function Create-Directory
 Export-ModuleMember -Function Exist-File
+Export-ModuleMember -Function Ensure-NodeAddress
