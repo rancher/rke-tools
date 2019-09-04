@@ -111,4 +111,91 @@ function Complete-AzureCloudConfig
     }
 }
 
+function Repair-CloudMetadataRoutes
+{
+    param (
+        [parameter(Mandatory = $false)] $CloudProviderName
+    )
+
+    if ($CloudProviderName) {
+        switch -Regex ($CloudProviderName) {
+            '^\s*aws\s*$' {
+                $errMsg = $(wins.exe cli route add --addresses "169.254.169.254 169.254.169.253 169.254.169.249 169.254.169.123 169.254.169.250 169.254.169.251")
+                if (-not $?) {
+                    Log-Warn "Failed to repair AWS host routes: $errMsg"
+                }
+            }
+            '^\s*azure\s*$' {
+                $errMsg = $(wins.exe cli route add --addresses "169.254.169.254")
+                if (-not $?) {
+                    Log-Warn "Failed to repair Azure host routes: $errMsg"
+                }
+            }
+            '^\s*gce\s*$' {
+                $errMsg = $(wins.exe cli route add --addresses "169.254.169.254")
+                if (-not $?) {
+                    Log-Warn "Failed to repair GCE host routes: $errMsg"
+                }
+            }
+        }
+    }
+}
+
+function Get-NodeOverridedName
+{
+    param (
+        [parameter(Mandatory = $false)] $CloudProviderName
+    )
+
+    $nodeName = $null
+
+    if (Exist-File -Path "c:\run\cloud-provider-override-hostname") {
+        $nodeName = $(Get-Content -Raw -Path "c:\run\cloud-provider-override-hostname")
+        if ($nodeName) {
+            Log-Info "Got overriding hostname $nodeName from file"
+            return $nodeName
+        }
+    }
+
+    if ($CloudProviderName) {
+        try {
+            # repair contain route for `169.254.169.254` when using cloud provider
+            $actualGateway = $(route.exe PRINT 0.0.0.0 | Where-Object {$_ -match '0\.0\.0\.0.*[a-z]'} | Select-Object -First 1 | ForEach-Object {($_ -replace '0\.0\.0\.0|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
+            $expectedGateway = $(route.exe PRINT 169.254.169.254 | Where-Object {$_ -match '169\.254\.169\.254'} | Select-Object -First 1 | ForEach-Object {($_ -replace '169\.254\.169\.254|255\.255\.255\.255|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
+            if ($actualGateway -ne $expectedGateway) {
+                route.exe ADD 169.254.169.254 MASK 255.255.255.255 $actualGateway METRIC 1 | Out-Null
+            }
+        } catch {}
+        
+        switch -Regex ($CloudProviderName) {
+            '^\s*aws\s*$' {
+                # gain private DNS name
+                $nodeName = $(curl.exe -s "http://169.254.169.254/latest/meta-data/hostname")
+                if (-not $?) {
+                    Log-Error "Failed to gain the priave DNS name for AWS instance: $nodeName"
+                    $nodeName = $null
+                }
+            }
+            '^\s*gce\s*$' {
+                # gain the host name
+                $nodeName = $(curl.exe -s -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/hostname?alt=json")
+                if (-not $?) {
+                    Log-Error "Failed to gain the hostname for GCE instance: $nodeName"
+                    $nodeName = $null
+                }
+            }
+        }
+
+        if ($nodeName) {
+            $nodeName = $nodeName.Trim()
+            $nodeName | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cloud-provider-override-hostname"
+            Log-Info "Got overriding hostname $nodeName from metadata"
+        }
+    }
+
+    return $nodeName
+}
+
 Export-ModuleMember -Function Complete-AzureCloudConfig
+Export-ModuleMember -Function Repair-CloudMetadataRoutes
+Export-ModuleMember -Function Get-NodeOverridedName

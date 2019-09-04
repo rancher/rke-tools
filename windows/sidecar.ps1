@@ -10,7 +10,10 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
-Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+Import-Module -WarningAction Ignore -Name @(
+    "$PSScriptRoot\utils.psm1"
+    "$PSScriptRoot\cloud-provider.psm1"
+)
 
 # copy rke tools: service-sidekick -> shared volume -> host or container
 try {
@@ -44,8 +47,7 @@ try {
         # put runing scripts to c:\opt\rke-tools\
         Log-Info "Copying running scripts ..."
         Copy-Item -Force -Recurse  -Destination "c:\opt\rke-tools\" -Path @(
-            "c:\share\scripts\utils.psm1"
-            "c:\share\scripts\cloud-provider.psm1"
+            "c:\share\scripts\*.psm1"
             "c:\share\scripts\entrypoint.ps1" # entrypoint.ps1 should be put in the bottom as a sentinel
         ) | Out-Null
     }
@@ -62,9 +64,25 @@ $clusterCIDR = $env:RKE_CLUSTER_CIDR
 $clusterDomain = $env:RKE_CLUSTER_DOMAIN
 $clusterDnsServer = $env:RKE_CLUSTER_DNS_SERVER
 $clusterServiceCIDR = $env:RKE_CLUSTER_SERVICE_CIDR
-$nodeAddress = $env:RKE_NODE_ADDRESS
-$nodeInternalAddress = $env:RKE_NODE_INTERNAL_ADDRESS
+$nodeName = $env:RKE_NODE_NAME_OVERRIDE
+$cloudProviderName = $env:RKE_CLOUD_PROVIDER_NAME
 $cniInfo = @{}
+
+# cloud provider
+if ($cloudProviderName)
+{
+    # repair host routes
+    Repair-CloudMetadataRoutes -CloudProviderName $cloudProviderName
+
+    # find overriding host name
+    $nodeNameOverriding = Get-NodeOverridedName -CloudProviderName $cloudProviderName
+    if (-not [string]::IsNullOrEmpty($nodeNameOverriding)) {
+        $nodeName = $nodeNameOverriding
+    }
+}
+
+# ensure the node network address
+$nodeAddress = Ensure-NodeAddress -InternalAddress $env:RKE_NODE_INTERNAL_ADDRESS -Address $env:RKE_NODE_ADDRESS
 
 # output cni network configuration for kubelet
 #   windows docker doesn't support host network mode,
@@ -120,16 +138,13 @@ if ($networkConfigObj)
                     }
                 }
                 "host-gw" {
-                    $networkAddress = ""
-                    if ($nodeInternalAddress) {
-                        $networkAddress = $nodeInternalAddress
-                    } elseif ($nodeAddress)  {
-                        $networkAddress = $nodeAddress
+                    if (-not $nodeAddress) {
+                        Log-Fatal "Please indicate the address of this host"
                     }
 
-                    $networkMetadataJSON = wins.exe cli net get --address "$networkAddress"
+                    $networkMetadataJSON = wins.exe cli net get --address "$nodeAddress"
                     if (-not $?) {
-                        Log-Fatal "Could not get $networkAddress network adapter: $networkMetadataJSON"
+                        Log-Fatal "Could not get $nodeAddress network adapter: $networkMetadataJSON"
                     }
                     $networkMetadataObj = $networkMetadataJSON | ConvertTo-JsonObj
                     if (-not $networkMetadataObj) {
@@ -250,22 +265,10 @@ if ($networkConfigObj)
                 "--kube-subnet-mgr"
                 "--iptables-forward-rules=false"
             )
-
-            $networkAddress = $null
-            if ($nodeInternalAddress)  {
-                $networkAddress = $nodeInternalAddress
-            } elseif ($nodeAddress) {
-                $networkAddress = $nodeAddress
-            }
-            if ($networkAddress) {
+            if ($nodeAddress) {
                 $flannelArgs += @(
-                   "--iface=$networkAddress"
+                   "--iface=$nodeAddress"
                 )
-            }
-
-            $nodeName = $env:RKE_NODE_NAME_OVERRIDE
-            if (Exist-File -Path "c:\run\cloud-provider-override-hostname") {
-                $nodeName = $(Get-Content -Raw -Path "c:\run\cloud-provider-override-hostname")
             }
 
             $winsArgs = $($flannelArgs -join ' ')

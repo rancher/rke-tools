@@ -106,77 +106,19 @@ $prcExposes = ""
 $prcArgs = @()
 $cloudProviderName = $env:RKE_CLOUD_PROVIDER_NAME
 
-# cloud provider: repair host routes
-if ($cloudProviderName) 
+# cloud provider
+if ($cloudProviderName)
 {
-    switch -Regex ($cloudProviderName)
-    {
-        '^\s*aws\s*$' {
-            $errMsg = $(wins.exe cli route add --addresses "169.254.169.254 169.254.169.253 169.254.169.249 169.254.169.123 169.254.169.250 169.254.169.251")
-            if (-not $?) {
-                Log-Warn "Failed to repair AWS host routes: $errMsg"
-            }
-        }
-        '^\s*azure\s*$' {
-            $errMsg = $(wins.exe cli route add --addresses "169.254.169.254")
-            if (-not $?) {
-                Log-Warn "Failed to repair Azure host routes: $errMsg"
-            }
-        }
-        '^\s*gce\s*$' {
-            $errMsg = $(wins.exe cli route add --addresses "169.254.169.254")
-            if (-not $?) {
-                Log-Warn "Failed to repair GCE host routes: $errMsg"
-            }
-        }
-    }
-}
+    # repair host routes
+    Repair-CloudMetadataRoutes -CloudProviderName $cloudProviderName
 
-# cloud provider: find overriding host name
-$nodeNameOverridingIfNeeded = $null
-if (Exist-File -Path "c:\run\cloud-provider-override-hostname") 
-{
-    $nodeNameOverridingIfNeeded = $(Get-Content -Raw -Path "c:\run\cloud-provider-override-hostname")
-} 
-elseif($cloudProviderName)
-{
-    # repair contain route for `169.254.169.254` when using cloud provider
-    $actualGateway = $(route.exe PRINT 0.0.0.0 | Where-Object {$_ -match '0\.0\.0\.0.*[a-z]'} | Select-Object -First 1 | ForEach-Object {($_ -replace '0\.0\.0\.0|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
-    $expectedGateway = $(route.exe PRINT 169.254.169.254 | Where-Object {$_ -match '169\.254\.169\.254'} | Select-Object -First 1 | ForEach-Object {($_ -replace '169\.254\.169\.254|255\.255\.255\.255|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
-    if ($actualGateway -ne $expectedGateway) {
-        $errMsg = $(route.exe ADD 169.254.169.254 MASK 255.255.255.255 $actualGateway METRIC 1)
-        if (-not $?) {
-            Log-Error "Could not repair contain route for using cloud provider"
-        }
+    # find overriding host name
+    $nodeNameOverriding = Get-NodeOverridedName -CloudProviderName $cloudProviderName
+    if (-not [string]::IsNullOrEmpty($nodeNameOverriding)) {
+        $prcArgs += @(
+            "--hostname-override=$nodeNameOverriding"
+        )
     }
-
-    switch -Regex ($cloudProviderName)
-    {
-        '^\s*aws\s*$' {
-            # gain private DNS name
-            $nodeNameOverridingIfNeeded = $(curl.exe -s "http://169.254.169.254/latest/meta-data/hostname")
-            if (-not $?) {
-                Log-Error "Failed to gain the priave DNS name for AWS instance: $nodeNameOverridingIfNeeded"
-            }
-        }
-        '^\s*gce\s*$' {
-            # gain the host name
-            $nodeNameOverridingIfNeeded = $(curl.exe -s -H "Metadata-Flavor: Google" "http://169.254.169.254/computeMetadata/v1/instance/hostname?alt=json")
-            if (-not $?) {
-                Log-Error "Failed to gain the hostname for GCE instance: $nodeNameOverridingIfNeeded"
-            }
-        }
-    }
-}
-if ($nodeNameOverridingIfNeeded) {
-    $nodeNameOverridingIfNeeded = $nodeNameOverridingIfNeeded.Trim()
-    # ouput the overriding name info
-    $nodeNameOverridingIfNeeded | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cloud-provider-override-hostname"
-    Log-Info "Got overriding hostname $nodeNameOverridingIfNeeded"
-
-    $prcArgs += @(
-        "--hostname-override=$nodeNameOverridingIfNeeded"
-    )
 }
 
 # append passed arguments
@@ -199,7 +141,7 @@ switch ($command)
                     # repair Get-GcePdName method
                     # this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
                     try {
-                        Copy-Item -Force -Recurse -Destination "c:\run\" -Path "$PSScriptRoot\gce-patch\GetGcePdName.dll"
+                        Copy-Item -Force -Recurse -Destination "c:\host\run\" -Path "$PSScriptRoot\gce-patch\GetGcePdName.dll"
                     } catch {
                         Log-Warn "Failed to copy GetGcePdName.dll to host: $($_.Exception.Message)"
                     }
@@ -221,28 +163,12 @@ switch ($command)
             Log-Warn "Could not put private registry Docker configuration to the host: $($_.Exception.Message)"
         }
 
-        # patch the internal address into --node-ip
-        # also indicate the default network adapter as the node IP if internal address is blank
-        if (-not [string]::IsNullOrEmpty($env:RKE_NODE_INTERNAL_ADDRESS)) {
-            $internalAddress = $env:RKE_NODE_INTERNAL_ADDRESS
+        # patch the node address into --node-ip, this would not override that one passing by RKE
+        $nodeAddress = Ensure-NodeAddress -InternalAddress $env:RKE_NODE_INTERNAL_ADDRESS -Address $env:RKE_NODE_ADDRESS
+        if ($nodeAddress) {
             $prcArgs += @(
-                "--node-ip=$internalAddress"
+                "--node-ip=$nodeAddress"
             )
-        } else {
-            $getAdapterJson = wins.exe cli net get
-            if ($?) {
-                $defaultNetwork = $getAdapterJson | ConvertTo-JsonObj
-                if ($defaultNetwork) {
-                    $defaultNetworkAddress = $defaultNetwork.AddressCIDR -replace "/32",""
-                    $prcArgs += @(
-                        "--node-ip=$defaultNetworkAddress"
-                    )
-                } else {
-                    Log-Warn "Could not convert '$getAdapterJson' to json object"
-                }
-            } else {
-                Log-Warn "Could not get host network metadata: $getAdapterJson"
-            }
         }
 
         $prcPath = "c:\etc\kubernetes\bin\kubelet.exe"
