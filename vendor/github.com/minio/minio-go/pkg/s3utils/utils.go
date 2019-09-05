@@ -1,6 +1,6 @@
 /*
- * Minio Go Library for Amazon S3 Compatible Cloud Storage
- * Copyright 2015-2017 Minio, Inc.
+ * MinIO Go Library for Amazon S3 Compatible Cloud Storage
+ * Copyright 2015-2017 MinIO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,8 +47,8 @@ func IsValidDomain(host string) bool {
 	if host[len(host)-1:] == "_" || host[:1] == "_" {
 		return false
 	}
-	// host cannot start or end with a "."
-	if host[len(host)-1:] == "." || host[:1] == "." {
+	// host cannot start with a "."
+	if host[:1] == "." {
 		return false
 	}
 	// All non alphanumeric characters are invalid.
@@ -282,7 +282,7 @@ func checkBucketNameCommon(bucketName string, strict bool) (err error) {
 	if ipAddress.MatchString(bucketName) {
 		return errors.New("Bucket name cannot be an ip address")
 	}
-	if strings.Contains(bucketName, "..") {
+	if strings.Contains(bucketName, "..") || strings.Contains(bucketName, ".-") || strings.Contains(bucketName, "-.") {
 		return errors.New("Bucket name contains invalid characters")
 	}
 	if strict {
