@@ -118,6 +118,28 @@ function Ensure-NodeAddress
     return $Address
 }
 
+function Transfer-File
+{
+    param (
+        [parameter(Mandatory = $true)] [string]$Src,
+        [parameter(Mandatory = $true)] [string]$Dst
+    )
+
+    if (Test-Path -PathType leaf -Path $Dst) {
+        $dstHasher = Get-FileHash -Path $Dst
+        $srcHasher = Get-FileHash -Path $Src
+        if ($dstHasher.Hash -eq $srcHasher.Hash) {
+            return
+        }
+    }
+
+    try {
+        $null = Copy-Item -Force -Path $Src -Destination $Dst
+    } catch {
+        Log-Fatal "Could not transfer file $Src to $Dst : $($_.Exception.Message)"
+    }
+}
+
 Export-ModuleMember -Function Log-Info
 Export-ModuleMember -Function Log-Warn
 Export-ModuleMember -Function Log-Error
@@ -126,3 +148,4 @@ Export-ModuleMember -Function ConvertTo-JsonObj
 Export-ModuleMember -Function Create-Directory
 Export-ModuleMember -Function Exist-File
 Export-ModuleMember -Function Ensure-NodeAddress
+Export-ModuleMember -Function Transfer-File

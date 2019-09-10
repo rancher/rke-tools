@@ -57,7 +57,10 @@ try {
 
 # copy cni related binaries
 Create-Directory -Path "c:\host\opt\cni\bin"
-Copy-Item -ErrorAction Ignore -Force -Destination "c:\host\opt\cni\bin\" -Path "c:\opt\cni\bin\*.exe"
+Get-ChildItem -Path "c:\opt\cni\bin" | ForEach-Object {
+    $fileName = $_.Name
+    Transfer-File -Src "c:\opt\cni\bin\$fileName" -Dst "c:\host\opt\cni\bin\$fileName"
+}
 
 # process cni network configuration
 $clusterCIDR = $env:RKE_CLUSTER_CIDR
@@ -225,28 +228,27 @@ if ($networkConfigObj)
     switch ($networkConfigObj.plugin) 
     {
         "flannel" {
-            $type = $null
-            $vni = $null
-            $port = $null
+            $type = "vxlan"
+             # VXLAN Identifier (VNI) to be used, it must be `greater than or equal to 4096` if the cluster includes Windows node
+            $vni = 4096
+            # UDP port to use for sending encapsulated packets, it must be `equal to 4789` if the cluster includes Windows node
+            $port = 4789
             try {
                 $options = $networkConfigObj.options
 
-                $type = $options.flannel_backend_type
-                if (-not $type) {
-                    $type = "vxlan"
+                $ptype = $options.flannel_backend_type
+                if ($ptype) {
+                    $type = $ptype
                 }
 
                 # VXLAN Identifier (VNI) to be used, it must be `greater than or equal to 4096` if the cluster includes Windows node
-                $vni = $options.flannel_backend_vni
-                if (-not $vni) {
-                    $vni = 4096
-                } else {
-                    $vni = [int]$vni
+                $pvni = $options.flannel_backend_vni
+                if ($pvni) {
+                   $vni = [int]$pvni
                 }
-
-                # UDP port to use for sending encapsulated packets, it must be `equal to 4789` if the cluster includes Windows node
-                $port = 4789
-            } catch { }
+            } catch {
+                Log-Warn "Could not patch flannel network configration: $($_.Exception.Message)"
+            }
             
             @{
                 Network = $clusterCIDR
@@ -270,6 +272,9 @@ if ($networkConfigObj)
                    "--iface=$nodeAddress"
                 )
             }
+
+            Create-Directory -Path "c:\host\opt\bin"
+            Transfer-File -Src "c:\opt\bin\flanneld.exe" -Dst "c:\host\opt\bin\flanneld.exe"
 
             $winsArgs = $($flannelArgs -join ' ')
             Log-Info "Start flanneld with: $winsArgs"

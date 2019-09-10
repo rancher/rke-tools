@@ -159,13 +159,15 @@ function Get-NodeOverridedName
 
     if ($CloudProviderName) {
         try {
-            # repair contain route for `169.254.169.254` when using cloud provider
+            # repair container route for `169.254.169.254` when using cloud provider
             $actualGateway = $(route.exe PRINT 0.0.0.0 | Where-Object {$_ -match '0\.0\.0\.0.*[a-z]'} | Select-Object -First 1 | ForEach-Object {($_ -replace '0\.0\.0\.0|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
             $expectedGateway = $(route.exe PRINT 169.254.169.254 | Where-Object {$_ -match '169\.254\.169\.254'} | Select-Object -First 1 | ForEach-Object {($_ -replace '169\.254\.169\.254|255\.255\.255\.255|[a-z]|\s+',' ').Trim() -split ' '} | Select-Object -First 1)
             if ($actualGateway -ne $expectedGateway) {
                 route.exe ADD 169.254.169.254 MASK 255.255.255.255 $actualGateway METRIC 1 | Out-Null
             }
-        } catch {}
+        } catch {
+            Log-Error "Failed to repair container route: $($_.Exception.Message)"
+        }
         
         switch -Regex ($CloudProviderName) {
             '^\s*aws\s*$' {
