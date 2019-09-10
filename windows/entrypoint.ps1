@@ -171,6 +171,9 @@ switch ($command)
             )
         }
 
+        Create-Directory -Path "c:\host\etc\kubernetes\bin"
+        Transfer-File -Src "c:\etc\kubernetes\bin\kubelet.exe" -Dst "c:\host\etc\kubernetes\bin\kubelet.exe"
+
         $prcPath = "c:\etc\kubernetes\bin\kubelet.exe"
         $prcExposes = "TCP:10250"
     }
@@ -209,6 +212,9 @@ switch ($command)
                 "--network-name=$($cniConfig.Interface)"
             )
         }
+
+        Create-Directory -Path "c:\host\etc\kubernetes\bin"
+        Transfer-File -Src "c:\etc\kubernetes\bin\kube-proxy.exe" -Dst "c:\host\etc\kubernetes\bin\kube-proxy.exe"
 
         $prcPath = "c:\etc\kubernetes\bin\kube-proxy.exe"
         $prcExposes = "TCP:10256"
