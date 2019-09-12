@@ -291,6 +291,13 @@ func SaveBackupAction(c *cli.Context) error {
 		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
 			return err
 		}
+		prefix := getNamePrefix(backupName)
+		// we only clean named backups if we have a retention period and a cluster name prefix
+		if retentionPeriod != 0 && len(prefix) != 0 {
+			if err := DeleteNamedBackups(retentionPeriod, prefix); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	log.WithFields(log.Fields{
