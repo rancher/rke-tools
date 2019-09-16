@@ -110,6 +110,56 @@ var commonFlags = []cli.Flag{
 	},
 }
 
+var deleteFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "name",
+		Usage: "snapshot name to delete",
+	},
+	cli.BoolFlag{
+		Name:  "s3-backup",
+		Usage: "delete snapshot from s3",
+	},
+	cli.BoolFlag{
+		Name:  "cleanup",
+		Usage: "delete uncompressed files only",
+	},
+	cli.StringFlag{
+		Name:   "s3-endpoint",
+		Usage:  "Specify s3 endpoint address",
+		EnvVar: "S3_ENDPOINT",
+	},
+	cli.StringFlag{
+		Name:   "s3-accessKey",
+		Usage:  "Specify s3 access key",
+		EnvVar: "S3_ACCESS_KEY",
+	},
+	cli.StringFlag{
+		Name:   "s3-secretKey",
+		Usage:  "Specify s3 secret key",
+		EnvVar: "S3_SECRET_KEY",
+	},
+	cli.StringFlag{
+		Name:   "s3-bucketName",
+		Usage:  "Specify s3 bucket name",
+		EnvVar: "S3_BUCKET_NAME",
+	},
+	cli.StringFlag{
+		Name:   "s3-region",
+		Usage:  "Specify s3 bucket region",
+		EnvVar: "S3_BUCKET_REGION",
+	},
+	cli.StringFlag{
+		Name:   "s3-endpoint-ca",
+		Usage:  "Specify custom CA for S3 endpoint. Can be a file path or a base64 string",
+		EnvVar: "S3_ENDPOINT_CA",
+	},
+	cli.StringFlag{
+		Name:   "s3-folder",
+		Usage:  "Specify folder for snapshots",
+		EnvVar: "S3_FOLDER",
+	},
+}
+
 type backupConfig struct {
 	Backup     bool
 	Endpoint   string
@@ -173,6 +223,12 @@ func BackupCommand() cli.Command {
 				Usage:  "Take snapshot on all etcd hosts and backup to s3 compatible storage",
 				Flags:  snapshotFlags,
 				Action: SaveBackupAction,
+			},
+			{
+				Name:   "delete",
+				Usage:  "Delete snapshot from etcd hosts or s3 compatible storage",
+				Flags:  deleteFlags,
+				Action: DeleteBackupAction,
 			},
 			{
 				Name:   "download",
@@ -447,15 +503,15 @@ func DeleteBackups(backupTime time.Time, retentionPeriod time.Duration) {
 			}).Warn("Couldn't parse backup")
 
 		} else if backupTime.Before(cutoffTime) {
-			_ = DeleteBackup(file)
+			_ = deleteBackup(file.Name())
 		}
 	}
 }
 
-func DeleteBackup(file os.FileInfo) error {
-	toDelete := fmt.Sprintf("%s/%s", backupBaseDir, file.Name())
+func deleteBackup(fileName string) error {
+	toDelete := fmt.Sprintf("%s/%s", backupBaseDir, path.Base(fileName))
 
-	cmd := exec.Command("rm", "-r", toDelete)
+	cmd := exec.Command("rm", "-f", toDelete)
 
 	startTime := time.Now()
 	err2 := cmd.Run()
@@ -463,13 +519,13 @@ func DeleteBackup(file os.FileInfo) error {
 
 	if err2 != nil {
 		log.WithFields(log.Fields{
-			"name":  file.Name(),
+			"name":  fileName,
 			"error": err2,
 		}).Warn("Delete backup failed")
 		return err2
 	}
 	log.WithFields(log.Fields{
-		"name":    file.Name(),
+		"name":    fileName,
 		"runtime": endTime.Sub(startTime),
 	}).Info("Deleted backup")
 	return nil
@@ -525,6 +581,68 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 			log.Infof("Success delete s3 backup file [%s]", backupDeleteList[i])
 		}
 	}
+}
+
+func DeleteBackupAction(c *cli.Context) error {
+	name := c.String("name")
+	if name == "" {
+		return fmt.Errorf("snapshot name is required")
+	}
+	compressedPath := fmt.Sprintf("/backup/%s.%s", name, compressedExtension)
+	uncompressedPath := fmt.Sprintf("/backup/%s", name)
+
+	// Since we have to support compressed and uncompressed versions of snapshots.
+	// We can't remove the uncompressed snapshot during cleanup unless we are
+	// sure the compressed is there, hence the complex check.
+	if c.Bool("cleanup") {
+		if _, err := os.Stat(compressedPath); err == nil {
+			// for cleanup, we only want to delete the uncompressed snapshot.
+			// we don't need to go to s3
+			return deleteBackup(uncompressedPath)
+		}
+	} else {
+		for _, p := range []string{compressedPath, uncompressedPath} {
+			if err := deleteBackup(p); err != nil {
+				return err
+			}
+		}
+	}
+
+	if !c.Bool("s3-backup") {
+		return nil
+	}
+
+	bc := &backupConfig{
+		Endpoint:   c.String("s3-endpoint"),
+		AccessKey:  c.String("s3-accessKey"),
+		SecretKey:  c.String("s3-secretKey"),
+		BucketName: c.String("s3-bucketName"),
+		Region:     c.String("s3-region"),
+		EndpointCA: c.String("s3-endpoint-ca"),
+		Folder:     c.String("s3-folder"),
+	}
+	client, err := setS3Service(bc, true)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"s3-endpoint":    bc.Endpoint,
+			"s3-bucketName":  bc.BucketName,
+			"s3-accessKey":   bc.AccessKey,
+			"s3-region":      bc.Region,
+			"s3-endpoint-ca": bc.EndpointCA,
+			"s3-folder":      bc.Folder,
+		}).Errorf("failed to set s3 server: %s", err)
+		return fmt.Errorf("failed to set s3 server: %+v", err)
+	}
+	folder := c.String("s3-folder")
+	if len(folder) != 0 {
+		name = fmt.Sprintf("%s/%s", folder, name)
+	}
+	for _, p := range []string{name, fmt.Sprintf("%s.%s", name, compressedExtension)} {
+		if err = client.RemoveObject(bc.BucketName, p); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
@@ -732,7 +850,7 @@ func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
 	cutoffTime := time.Now().Add(retentionPeriod * -1)
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), prefix) && file.ModTime().Before(cutoffTime) && IsRecurringSnapshot(file.Name()) {
-			if err = DeleteBackup(file); err != nil {
+			if err = deleteBackup(file.Name()); err != nil {
 				return err
 			}
 		}
