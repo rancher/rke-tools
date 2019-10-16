@@ -21,9 +21,12 @@ set_azure_config() {
   local az_vm_name=$(curl -s -H Metadata:true "${AZURE_META_URL}/name?api-version=2017-08-01&format=text")
 
   # setting correct login cloud
-  if [ "${azure_cloud}" = "null" ] || [ "${azure_cloud}" = "" ]; then
-      azure_cloud="AzureCloud"
-  fi
+  case "${azure_cloud}" in
+    "AZURECHINACLOUD")        azure_cloud="AzureChinaCloud" ;;
+    "AZUREGERMANCLOUD")       azure_cloud="AzureGermanCloud" ;;
+    "AZUREUSGOVERNMENTCLOUD") azure_cloud="AzureUSGovernment" ;;
+    *)                        azure_cloud="AzureCloud" ;;
+  esac
   az cloud set --name ${azure_cloud}
 
   # login to Azure
