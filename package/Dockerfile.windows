@@ -34,7 +34,7 @@ RUN $URL = 'https://github.com/thxCode/containernetworking-plugins/releases/down
     \
     Write-Host 'Complete.'
 # download flanneld
-RUN $URL = 'https://github.com/thxCode/coreos-flannel/releases/download/v0.2.0-rancher/binaries.zip'; \
+RUN $URL = 'https://github.com/thxCode/coreos-flannel/releases/download/v0.3.1-rancher/binaries.zip'; \
     \
     Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
