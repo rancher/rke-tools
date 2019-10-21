@@ -45,7 +45,7 @@ RUN $URL = 'https://github.com/thxCode/coreos-flannel/releases/download/v0.3.1-r
     \
     Write-Host 'Complete.'
 # download flexvolume plugins
-RUN $URL = 'https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip'; \
+RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V0.0.3/flexvolume-windows.zip'; \
     \
     Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
