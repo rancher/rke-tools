@@ -2,7 +2,7 @@
 
 SSL_CRTS_DIR=${CRTS_DEPLOY_PATH:-/etc/kubernetes/ssl}
 mkdir -p $SSL_CRTS_DIR
-chmod 700 $SSL_CRTS_DIR
+chmod 755 $SSL_CRTS_DIR
 
 for i in $(env | grep -o KUBE_.*=); do
   name="$(echo "$i" | cut -f1 -d"=" | tr '[:upper:]' '[:lower:]' | tr '_' '-').pem"
@@ -25,11 +25,22 @@ for i in $(env | grep -o KUBECFG_.*=); do
 done
 
 # only enabled if we are running etcd with custom uid/gid
+# change ownership of etcd cert and key and kube-ca to the custom uid/gid
 if [ -n "${ETCD_UID}" ] && [ -n "${ETCD_GID}" ]; then
   # set minial mask to allow effective read access to the certificates
   setfacl -R -m m::rX "${SSL_CRTS_DIR}" && echo "Successfully set ACL mask for certs dir"
-  # allow certs dir read access to the custom etcd uid
-  setfacl -R -m u:${ETCD_UID}:rX "${SSL_CRTS_DIR}" && echo "Successfully set user ACL for certs dir"
+  # we remove certs dir acl if any for the custom etcd uid, since chown will give that access
+  setfacl -R -x u:${ETCD_UID} "${SSL_CRTS_DIR}" && echo "Successfully unset user ACL for certs dir"
   # allow certs dir read access to the custom etcd gid
-  setfacl -R -m g:${ETCD_GID}:rX "${SSL_CRTS_DIR}" && echo "Successfully set group ACL for certs dir"
+  setfacl -R -x g:${ETCD_GID} "${SSL_CRTS_DIR}" && echo "Successfully unset group ACL for certs dir"
+
+  for name in $SSL_CRTS_DIR/*.pem; do
+    if [[ $name == *kube-etcd* ]] ; then
+        chown "${ETCD_UID}":"${ETCD_GID}" $name
+    fi
+    if [[ $name == *kube-ca.pem ]] ; then
+        chmod 644 $name
+    fi
+  done
+  chmod 755 $SSL_CRTS_DIR
 fi
