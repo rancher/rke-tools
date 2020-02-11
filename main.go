@@ -269,6 +269,7 @@ func BackupCommand() cli.Command {
 func SetLoggingLevel(debug bool) {
 	if debug {
 		log.SetLevel(log.DebugLevel)
+		log.Debug("Log level set to debug")
 	} else {
 		log.SetLevel(log.InfoLevel)
 	}
@@ -447,7 +448,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 		log.WithFields(log.Fields{
 			"name":    backupName,
 			"runtime": endTime.Sub(startTime),
-		}).Info("Created backup")
+		}).Info("Created local backup")
 
 		if err := os.Chmod(compressedFilePath, 0600); err != nil {
 			log.WithFields(log.Fields{
@@ -521,13 +522,13 @@ func deleteBackup(fileName string) error {
 		log.WithFields(log.Fields{
 			"name":  fileName,
 			"error": err2,
-		}).Warn("Delete backup failed")
+		}).Warn("Delete local backup failed")
 		return err2
 	}
 	log.WithFields(log.Fields{
 		"name":    fileName,
 		"runtime": endTime.Sub(startTime),
-	}).Info("Deleted backup")
+	}).Info("Deleted local backup")
 	return nil
 }
 
@@ -549,6 +550,8 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 	prefix := ""
 	if len(bc.Folder) != 0 {
 		prefix = bc.Folder
+		// Recurse will show us the files in the folder
+		isRecursive = true
 	}
 	objectCh := svc.ListObjects(bc.BucketName, prefix, isRecursive, doneCh)
 	re := regexp.MustCompile(fmt.Sprintf(".+_etcd(|.%s)$", compressedExtension))
@@ -559,18 +562,32 @@ func DeleteS3Backups(backupTime time.Time, retentionPeriod time.Duration, svc *m
 		}
 		// only parse backup file names that matches *_etcd format
 		if re.MatchString(object.Key) {
-			backupTime, err := time.Parse(time.RFC3339, strings.Split(object.Key, "_")[0])
+			filename := object.Key
+
+			if len(bc.Folder) != 0 {
+				// example object.Key with folder: folder/timestamp_etcd.zip
+				// folder and separator needs to be stripped so time can be parsed below
+				log.Debugf("Stripping [%s] from [%s]", fmt.Sprintf("%s/", prefix), filename)
+				filename = strings.TrimPrefix(filename, fmt.Sprintf("%s/", prefix))
+			}
+			log.Debugf("object.Key: [%s], filename: [%s]", object.Key, filename)
+
+			backupTime, err := time.Parse(time.RFC3339, strings.Split(filename, "_")[0])
 			if err != nil {
 				log.WithFields(log.Fields{
-					"name":  object.Key,
-					"error": err,
+					"name":      filename,
+					"objectKey": object.Key,
+					"error":     err,
 				}).Warn("Couldn't parse s3 backup")
 
 			} else if backupTime.Before(cutoffTime) {
+				// We use object.Key here as we need the full path when a folder is used
+				log.Debugf("Adding [%s] to files to delete, backupTime: [%q], cutoffTime: [%q]", object.Key, backupTime, cutoffTime)
 				backupDeleteList = append(backupDeleteList, object.Key)
 			}
 		}
 	}
+	log.Debugf("Found %d files to delete", len(backupDeleteList))
 
 	for i := range backupDeleteList {
 		log.Infof("Start to delete s3 backup file [%s]", backupDeleteList[i])
@@ -647,7 +664,15 @@ func DeleteBackupAction(c *cli.Context) error {
 
 func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 	// Initialize minio client object.
-	log.Info("invoking set s3 service client")
+	log.WithFields(log.Fields{
+		"s3-endpoint":    bc.Endpoint,
+		"s3-bucketName":  bc.BucketName,
+		"s3-accessKey":   bc.AccessKey,
+		"s3-region":      bc.Region,
+		"s3-endpoint-ca": bc.EndpointCA,
+		"s3-folder":      bc.Folder,
+	}).Info("invoking set s3 service client")
+
 	var err error
 	var client = &minio.Client{}
 	var cred = &credentials.Credentials{}
@@ -710,7 +735,7 @@ func getBucketLookupType(endpoint string) minio.BucketLookupType {
 
 func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string) error {
 	// Upload the zip file with FPutObject
-	log.Infof("invoking uploading backup file %s to s3", fileName)
+	log.Infof("invoking uploading backup file [%s] to s3", fileName)
 	for retries := 0; retries <= s3ServerRetries; retries++ {
 		n, err := svc.FPutObject(bucketName, fileName, filePath, minio.PutObjectOptions{ContentType: contentType})
 		if err != nil {
@@ -720,7 +745,7 @@ func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string) 
 			}
 			continue
 		}
-		log.Infof("Successfully uploaded %s of size %d\n", fileName, n)
+		log.Infof("Successfully uploaded [%s] of size [%d]", fileName, n)
 		break
 	}
 	return nil
