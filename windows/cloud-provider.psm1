@@ -18,6 +18,7 @@ function Complete-AzureCloudConfig
         # gain user configruation
         $azCloudConfig = Get-Content -Raw -Path $CloudConfigPath | ConvertTo-JsonObj
         $azureCloud = $azCloudConfig.cloud
+        $azureVmType = $azCloudConfig.vmType
         $azureClientId = $azCloudConfig.aadClientId
         $azureClientSecret = $azCloudConfig.aadClientSecret
         $azureTenantId = $azCloudConfig.tenantId
@@ -35,6 +36,9 @@ function Complete-AzureCloudConfig
         if (-not $azureCloud) {
             $azureCloud = "AzureCloud"
             Log-Warn "Could not find 'cloud', set '$azureCloud' as default"
+        }
+        if ($azureCloud -eq "AzureUSGovernmentCloud") {
+            $azureCloud = "AzureUSGovernment"
         }
         $errMsg = az cloud set --name $azureCloud
         if (-not $?) {
@@ -57,22 +61,27 @@ function Complete-AzureCloudConfig
         if (-not $?) {
             Log-Fatal "Failed to login '$azureCloud' cloud: $errMsg"
         }
+
+        $vmcmd = "vm"
+        if ($azureVmType -eq "vmss") {
+            $vmcmd = "vmss"
+        }
         
-        $errMsg = (((az vm nic list -g $azResourcesGroup --vm-name $azVmName --output 'json' --query "[0].id") -replace '"', '') -split '/')[8]
+        $errMsg = (((az $vmcmd nic list -g $azResourcesGroup --vm-name $azVmName --output 'json' --query "[0].id") -replace '"', '') -split '/')[8]
         if (-not $?) {
-            Log-Fatal "Failed to get vm nic: $errMsg"
+            Log-Fatal "Failed to get $vmcmd nic: $errMsg"
         }
         $azVmNic = $errMsg
 
-        $errMsg = (((az vm nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
+        $errMsg = (((az $vmcmd nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
         if (-not $?) {
-            Log-Fatal "Failed to get subnet of vm nic '$azVmNic': $errMsg"
+            Log-Fatal "Failed to get subnet of $vmcmd nic '$azVmNic': $errMsg"
         }
         $azVmNicSubnet = $errMsg
 
-        $errMsg = (((az vm nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
+        $errMsg = (((az $vmcmd nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
         if (-not $?) {
-            Log-Fatal "Failed to get security group of vm nic '$azVmNic': $errMsg"
+            Log-Fatal "Failed to get security group of $vmcmd nic '$azVmNic': $errMsg"
         }
         $azVmNicSecurityGroup = $errMsg
 

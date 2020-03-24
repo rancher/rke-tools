@@ -16,13 +16,17 @@ set_azure_config() {
   local az_vnet_resource_group=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .vnetResourceGroup)
   local az_subnet_name=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .subnetName)
   local az_vnet_name=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .vnetName)
+  local az_vm_type=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .vmType)
 
   local az_vm_resources_group=$(curl  -s -H Metadata:true "${AZURE_META_URL}/resourceGroupName?api-version=2017-08-01&format=text")
   local az_vm_name=$(curl -s -H Metadata:true "${AZURE_META_URL}/name?api-version=2017-08-01&format=text")
 
   # setting correct login cloud
   if [ "${azure_cloud}" = "null" ] || [ "${azure_cloud}" = "" ]; then
-      azure_cloud="AzureCloud"
+    azure_cloud="AzureCloud"
+  fi
+  if [ "${azure_cloud}" = "AzureUSGovernmentCloud" ]; then
+    azure_cloud="AzureUSGovernment" # naming issue with azure cli
   fi
   az cloud set --name ${azure_cloud}
 
@@ -37,22 +41,27 @@ set_azure_config() {
     az_location=$(curl  -s -H Metadata:true "${AZURE_META_URL}/location?api-version=2017-08-01&format=text")
   fi
 
-  local az_vm_nic=$(az vm nic list -g ${az_resources_group} --vm-name ${az_vm_name} | jq -r .[0].id | cut -d "/" -f 9)
+  vmcmd="vm" # default is "standard" and needs "vm" cmd
+  if [ "$az_vm_type" = "vmss" ]; then
+    vmcmd="vmss" # scale set cmd
+  fi
+
+  local az_vm_nic=$(az $vmcmd nic list -g ${az_resources_group} --vm-name ${az_vm_name} | jq -r .[0].id | cut -d "/" -f 9)
 
   if [ -z "$az_subnet_name" ] ; then
-    az_subnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
+    az_subnet_name=$(az $vmcmd nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 11)
   fi
 
   if [ -z "$az_vnet_name" ] ; then
-    az_vnet_name=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
+    az_vnet_name=$(az $vmcmd nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 9)
   fi
 
   if [ -z "$az_vnet_resource_group" ] ; then
-    az_vnet_resource_group=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
+    az_vnet_resource_group=$(az $vmcmd nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic}| jq -r .ipConfigurations[0].subnet.id| cut -d"/" -f 5)
   fi
 
   if [ -z "$az_vm_nsg" ] ; then
-    az_vm_nsg=$(az vm nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
+    az_vm_nsg=$(az $vmcmd nic show -g ${az_resources_group} --vm-name ${az_vm_name} --nic ${az_vm_nic} | jq -r .networkSecurityGroup.id | cut -d "/" -f 9)
   fi
 
   az logout 2>&1 > /dev/null
