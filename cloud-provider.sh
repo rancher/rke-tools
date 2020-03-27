@@ -53,7 +53,7 @@ set_azure_config() {
     fi
 
     if [ -z "$az_vnet_name" ] ; then
-      az_vnet_name=$(az vmss nic show -g ${az_resources_group} --vmss-name ${az_vm_scale_set_name} --name ${az_vm_nic}  | jq -r .ipConfigurations[0].subnet.id | cut -d "/" -f 9)
+      az_vnet_name=$(az vmss nic show -g ${az_resources_group} --vmss-name ${az_vm_scale_set_name} --name ${az_vm_nic} --instance-id ${az_vm_instance_id}  | jq -r .ipConfigurations[0].subnet.id | cut -d "/" -f 9)
     fi
 
     if [ -z "$az_vnet_resource_group" ] ; then
