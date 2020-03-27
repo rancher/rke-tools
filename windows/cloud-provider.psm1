@@ -76,13 +76,13 @@ function Complete-AzureCloudConfig
             }
             $azVmNic = $errMsg
 
-            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --nic $azVmNic --instance-id $azVmInstanceId --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
+            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --name $azVmNic --instance-id $azVmInstanceId --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
             if (-not $?) {
                 Log-Fatal "Failed to get subnet of vmss nic '$azVmNic': $errMsg"
             }
             $azVmNicSubnet = $errMsg
 
-            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --nic $azVmNic --instance-id $azVmInstanceId --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
+            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --name $azVmNic --instance-id $azVmInstanceId --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
             if (-not $?) {
                 Log-Fatal "Failed to get security group of vmss nic '$azVmNic': $errMsg"
             }
