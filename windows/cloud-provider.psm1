@@ -6,14 +6,18 @@ $InformationPreference = 'SilentlyContinue'
 
 function Complete-AzureCloudConfig 
 {
-	param (
-		[parameter(Mandatory = $true)] $CloudConfigPath
-	)
+    param (
+        [parameter(Mandatory = $true)] $CloudConfigPath
+    )
 	
     try
     {
         # refresh local PATH
         $env:PATH = "c:\azure-cli\python\;c:\azure-cli\python\Scripts\;$($env:PATH)"
+
+        # metadata server config
+        $azureMetaURL = "http://169.254.169.254/metadata/instance/compute"
+        $azureMetaVersion = "2019-08-15"
 
         # gain user configruation
         $azCloudConfig = Get-Content -Raw -Path $CloudConfigPath | ConvertTo-JsonObj
@@ -46,11 +50,10 @@ function Complete-AzureCloudConfig
         }
 
         # gain resource information
-        $azureMetaURL = "http://169.254.169.254/metadata/instance/compute"
-        $azLocation = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/location?api-version=2017-08-01&format=text")
-        $azResourcesGroup = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/resourceGroupName?api-version=2017-08-01&format=text")
-        $azSubscriptionId = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/subscriptionId?api-version=2017-08-01&format=text")
-        $azVmName = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/name?api-version=2017-08-01&format=text")
+        $azLocation = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/location?api-version=$azureMetaVersion&format=text")
+        $azResourcesGroup = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/resourceGroupName?api-version=$azureMetaVersion&format=text")
+        $azSubscriptionId = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/subscriptionId?api-version=$azureMetaVersion&format=text")
+        $azVmName = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/name?api-version=$azureMetaVersion&format=text")
         if ((-not $azLocation) -or (-not $azSubscriptionId) -or (-not $azResourcesGroup) -or (-not $azVmName)) {
             Log-Warn "Some Azure cloud provider variables were not populated correctly, using the passed cloud provider config"
             return
@@ -62,28 +65,47 @@ function Complete-AzureCloudConfig
             Log-Fatal "Failed to login '$azureCloud' cloud: $errMsg"
         }
 
-        $vmcmd = "vm"
         if ($azureVmType -eq "vmss") {
-            $vmcmd = "vmss"
-        }
-        
-        $errMsg = (((az $vmcmd nic list -g $azResourcesGroup --vm-name $azVmName --output 'json' --query "[0].id") -replace '"', '') -split '/')[8]
-        if (-not $?) {
-            Log-Fatal "Failed to get $vmcmd nic: $errMsg"
-        }
-        $azVmNic = $errMsg
+            # instance id in the scale set, usually name_<id> but get from api to be sure
+            $azVmScaleSetName = $(curl.exe  -s -H "Metadata:true" "$azureMetaURL/vmScaleSetName?api-version=$azureMetaVersion&format=text")
+            $azVmInstanceId = (az vmss list-instances -g $azResourcesGroup --name $azVmScaleSetName --query "[?name=='$azVmName'].instanceId" --output tsv).trim()
 
-        $errMsg = (((az $vmcmd nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
-        if (-not $?) {
-            Log-Fatal "Failed to get subnet of $vmcmd nic '$azVmNic': $errMsg"
-        }
-        $azVmNicSubnet = $errMsg
+            $errMsg = (az vmss nic list -g $azResourcesGroup --vmss-name $azVmScaleSetName --query "[0].name" --output 'tsv').trim()
+            if (-not $?) {
+                Log-Fatal "Failed to get vmss nic: $errMsg"
+            }
+            $azVmNic = $errMsg
 
-        $errMsg = (((az $vmcmd nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
-        if (-not $?) {
-            Log-Fatal "Failed to get security group of $vmcmd nic '$azVmNic': $errMsg"
+            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --nic $azVmNic --instance-id $azVmInstanceId --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
+            if (-not $?) {
+                Log-Fatal "Failed to get subnet of vmss nic '$azVmNic': $errMsg"
+            }
+            $azVmNicSubnet = $errMsg
+
+            $errMsg = (((az vmss nic show -g $azResourcesGroup --vmss-name $azVmScaleSetName --nic $azVmNic --instance-id $azVmInstanceId --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
+            if (-not $?) {
+                Log-Fatal "Failed to get security group of vmss nic '$azVmNic': $errMsg"
+            }
+            $azVmNicSecurityGroup = $errMsg
+        } else {
+            $errMsg = (((az vm nic list -g $azResourcesGroup --vm-name $azVmName --output 'json' --query "[0].id") -replace '"', '') -split '/')[8]
+            if (-not $?) {
+                Log-Fatal "Failed to get vm nic: $errMsg"
+            }
+            $azVmNic = $errMsg
+
+            $errMsg = (((az vm nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "ipConfigurations[0].subnet.id") -replace '"', '') -split '/')
+            if (-not $?) {
+                Log-Fatal "Failed to get subnet of vm nic '$azVmNic': $errMsg"
+            }
+            $azVmNicSubnet = $errMsg
+
+            $errMsg = (((az vm nic show -g $azResourcesGroup --vm-name $azVmName --nic $azVmNic --output 'json' --query "networkSecurityGroup.id") -replace '"', '') -split '/')
+            if (-not $?) {
+                Log-Fatal "Failed to get security group of vm nic '$azVmNic': $errMsg"
+            }
+            $azVmNicSecurityGroup = $errMsg
         }
-        $azVmNicSecurityGroup = $errMsg
 
         $null = az logout
 
