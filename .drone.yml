@@ -220,14 +220,13 @@ name: manifest
 
 steps:
   - name: push-manifest
-    image: plugins/manifest:1.1.0
+    image: ibuildthecloud/manifest:v1.2.3-patch1
     settings:
       username:
         from_secret: docker_username
       password:
         from_secret: docker_password
       spec: manifest.tmpl
-      ignore_missing: true
     when:
       instance:
       - drone-publish.rancher.io
@@ -241,3 +240,4 @@ depends_on:
 - linux-arm64
 - windows-1809
 - windows-1903
+- windows-1909
