@@ -1000,19 +1000,34 @@ func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (stri
 	}
 	// if folder is included, strip it so it doesnt end up in a folder on the host itself
 	targetFilename := path.Base(filename)
+	targetFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, targetFilename)
+	var object *minio.Object
+	var err error
 	for retries := 0; retries <= s3ServerRetries; retries++ {
-		err := client.FGetObject(bucket, filename, backupBaseDir+"/"+targetFilename, minio.GetObjectOptions{})
+		object, err = client.GetObject(bucket, filename, minio.GetObjectOptions{})
 		if err != nil {
 			log.Infof("Failed to download etcd snapshot file [%s]: %v, retried %d times", filename, err, retries)
 			if retries >= s3ServerRetries {
-				log.Warningf("Failed to download etcd snapshot file [%s]: %v", filename, err)
-				break
+				return "", fmt.Errorf("Unable to download backup file for [%s]: %v", filename, err)
 			}
 		}
 		log.Infof("Successfully downloaded [%s]", filename)
-		return targetFilename, nil
 	}
-	return "", fmt.Errorf("Unable to download backup file for [%s]", filename)
+
+	localFile, err := os.Create(targetFileLocation)
+	if err != nil {
+		return "", fmt.Errorf("Failed to create local file [%s]: %v", targetFileLocation, err)
+	}
+	defer localFile.Close()
+
+	if _, err = io.Copy(localFile, object); err != nil {
+		return "", fmt.Errorf("Failed to copy retrieved object to local file [%s]: %v", targetFileLocation, err)
+	}
+	if err := os.Chmod(targetFileLocation, 0600); err != nil {
+		return "", fmt.Errorf("changing permission of the locally downloaded snapshot failed")
+	}
+
+	return targetFilename, nil
 }
 
 func compressFile(fileName string) (string, error) {
