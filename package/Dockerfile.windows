@@ -67,15 +67,11 @@ RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.
     \
     Write-Host 'Complete.'
 # download flanneld
-RUN $URL = 'https://github.com/thxCode/coreos-flannel/releases/download/v0.3.1-rancher/binaries.zip'; \
-    \
+RUN $URL = 'https://github.com/coreos/flannel/releases/download/v0.12.0/flanneld.exe'; \
+	New-Item -Path c:\ -Name "flanneld" -ItemType "directory"; \
     Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile c:\flanneld.zip -Uri $URL; \
-    \
-    Write-Host 'Expanding ...'; \
-    Expand-Archive -Force -Path c:\flanneld.zip -DestinationPath c:\flanneld\.; \
-    \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\flanneld\flanneld.exe -Uri $URL; \
     Write-Host 'Complete.'
 # download flexvolume plugins
 RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V0.0.3/flexvolume-windows.zip'; \
@@ -112,7 +108,7 @@ COPY --from=builder /Windows/System32/netapi32.dll /Windows/System32/
 COPY --from=builder /wins.exe /confd.exe /Windows/
 COPY --from=builder /nginx-1.15.9 /etc/nginx
 COPY --from=builder /containernetworking/bin/host-local.exe /containernetworking/bin/flannel.exe /containernetworking/bin/win-overlay.exe /containernetworking/bin/win-bridge.exe /opt/cni/bin/
-COPY --from=builder /flanneld/dist/flanneld.exe /opt/bin/
+COPY --from=builder /flanneld/flanneld.exe /opt/bin/
 COPY --from=builder /flexvolume /share/kubelet-volumeplugins
 COPY --from=builder /GetGcePdName.dll /share/gce-patch/
 COPY windows/templates /etc/confd/templates/
