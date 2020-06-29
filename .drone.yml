@@ -220,7 +220,7 @@ name: manifest
 
 steps:
   - name: push-manifest
-    image: ibuildthecloud/manifest:v1.2.3-patch1
+    image: plugins/manifest
     settings:
       username:
         from_secret: docker_username
