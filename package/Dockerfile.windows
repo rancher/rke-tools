@@ -67,7 +67,7 @@ RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.
     \
     Write-Host 'Complete.'
 # download flanneld
-RUN $URL = 'https://github.com/coreos/flannel/releases/download/v0.12.0/flanneld.exe'; \
+RUN $URL = 'https://github.com/luthermonson/flannel/releases/download/v0.12.0-rancher1/flanneld.exe'; \
 	New-Item -Path c:\ -Name "flanneld" -ItemType "directory"; \
     Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
