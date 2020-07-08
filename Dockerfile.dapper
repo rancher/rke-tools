@@ -12,7 +12,7 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLAN
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
 RUN wget -O - https://dl.google.com/go/go1.12.9.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
-    go get golang.org/x/lint/golint && go get github.com/rancher/trash
+    go get golang.org/x/lint/golint
 
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
     DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
@@ -25,7 +25,6 @@ ENV DAPPER_ENV REPO TAG DRONE_TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rke-tools/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true
-ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV HOME ${DAPPER_SOURCE}
 WORKDIR ${DAPPER_SOURCE}
 
