@@ -819,6 +819,14 @@ func DownloadLocalBackup(c *cli.Context) error {
 	if len(endpoint) == 0 {
 		return fmt.Errorf("local-endpoint is required")
 	}
+	// The snapshot file may have been distributed to the host out of band,
+	// e.g. via an NFS share. In this case we will not overwrite the file
+	// since this might lead to all sorts of problems.
+	snapshotFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, snapshot)
+	if _, err := os.Stat(snapshotFileLocation); os.IsNotExist(err) {
+		log.Infof("Skipping download %s: File already exists", snapshot)
+		return nil
+	}
 	certs, err := getCertsFromCli(c)
 	if err != nil {
 		return err
@@ -841,8 +849,6 @@ func DownloadLocalBackup(c *cli.Context) error {
 		return fmt.Errorf("backup download failed: %v", resp.Body)
 	}
 	defer resp.Body.Close()
-
-	snapshotFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, snapshot)
 	snapshotFile, err := os.Create(snapshotFileLocation)
 	if err != nil {
 		return err
