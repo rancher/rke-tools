@@ -1,0 +1,53 @@
+# github.com/json-iterator/go v1.1.9
+github.com/json-iterator/go
+# github.com/klauspost/cpuid v1.2.3
+github.com/klauspost/cpuid
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/minio/md5-simd v1.1.0
+github.com/minio/md5-simd
+# github.com/minio/minio-go/v6 v6.0.57
+## explicit
+github.com/minio/minio-go/v6
+github.com/minio/minio-go/v6/pkg/credentials
+github.com/minio/minio-go/v6/pkg/encrypt
+github.com/minio/minio-go/v6/pkg/s3utils
+github.com/minio/minio-go/v6/pkg/set
+github.com/minio/minio-go/v6/pkg/signer
+github.com/minio/minio-go/v6/pkg/tags
+# github.com/minio/sha256-simd v0.1.1
+github.com/minio/sha256-simd
+# github.com/mitchellh/go-homedir v1.1.0
+github.com/mitchellh/go-homedir
+# github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
+github.com/modern-go/reflect2
+# github.com/sirupsen/logrus v1.5.0
+## explicit
+github.com/sirupsen/logrus
+# github.com/smartystreets/goconvey v1.6.4
+## explicit
+# github.com/stretchr/testify v1.6.1
+## explicit
+# github.com/urfave/cli v1.18.0
+## explicit
+github.com/urfave/cli
+# golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f
+golang.org/x/crypto/argon2
+golang.org/x/crypto/blake2b
+# golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
+## explicit
+golang.org/x/net/http/httpguts
+golang.org/x/net/idna
+golang.org/x/net/publicsuffix
+# golang.org/x/sys v0.0.0-20190422165155-953cdadca894
+golang.org/x/sys/cpu
+golang.org/x/sys/unix
+# golang.org/x/text v0.3.0
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+# gopkg.in/ini.v1 v1.42.0
+gopkg.in/ini.v1
