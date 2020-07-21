@@ -13,6 +13,10 @@ function Complete-AzureCloudConfig
     try
     {
         # refresh local PATH
+        # NOTE: The azure-cli executable is accessed via the hyperkube container. The installation happens here:
+        # https://github.com/rancher/hyperkube/blob/v1.18.6-rancher1/Dockerfile.windows#L53
+        # and the azure-cli build happens here:
+        # https://github.com/rancher/azure-cli
         $env:PATH = "c:\azure-cli\python\;c:\azure-cli\python\Scripts\;$($env:PATH)"
 
         # metadata server config
@@ -60,7 +64,10 @@ function Complete-AzureCloudConfig
         }
 
         # gain network information
-        $errMsg = az login --service-principal -u $azureClientId -p $azureClientSecret --tenant $azureTenantId
+        # NOTE: the escaping syntax around the secret is to ensure the azure-cli doesn't interpret the contents of the secret as a command.
+        # See this issue for more information:
+        # https://github.com/Azure/azure-cli/issues/8070
+        $errMsg = az login --service-principal -u $azureClientId -p "`"$azureClientSecret`"" --tenant $azureTenantId
         if (-not $?) {
             Log-Fatal "Failed to login '$azureCloud' cloud: $errMsg"
         }
