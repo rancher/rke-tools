@@ -34,6 +34,9 @@ set_azure_config() {
   # login to Azure
   az login --service-principal -u ${azure_client_id} -p ${azure_client_secret} --tenant ${azure_tenant_id} 2>&1 > /dev/null
 
+  # set subscription to be the current active subscription
+  az account set --subscription ${az_subscription_id}
+
   if [ -z "$az_resources_group" ] ; then
     az_resources_group="$az_vm_resources_group"
   fi
