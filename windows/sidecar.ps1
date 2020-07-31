@@ -228,6 +228,11 @@ if ($networkConfigObj)
     switch ($networkConfigObj.plugin) 
     {
         "flannel" {
+            $prefixPath = $env:RKE_NODE_PREFIX_PATH
+            if ($prefixPath -eq "") {
+                $prefixPath = "c:\"
+            }
+
             $type = "vxlan"
              # VXLAN Identifier (VNI) to be used, it must be `greater than or equal to 4096` if the cluster includes Windows node
             $vni = 4096
@@ -262,10 +267,11 @@ if ($networkConfigObj)
 
             $flannelArgs = @(
                 # could not use kubernetes in-cluster client, indicate kubeconfig instead
-                "--kubeconfig-file=c:\etc\kubernetes\ssl\kubecfg-kube-node.yaml"
+                "--kubeconfig-file=$prefixPath\etc\kubernetes\ssl\kubecfg-kube-node.yaml"
                 "--ip-masq"
                 "--kube-subnet-mgr"
                 "--iptables-forward-rules=false"
+                "--net-config-path=$prefixPath\etc\kube-flannel\net-conf.json"
             )
             if ($nodeAddress) {
                 $flannelArgs += @(
@@ -275,15 +281,19 @@ if ($networkConfigObj)
 
             Create-Directory -Path "c:\host\opt\bin"
             Transfer-File -Src "c:\opt\bin\flanneld.exe" -Dst "c:\host\opt\bin\flanneld.exe"
+            if ($prefixPath -ne "c:\") {
+                New-Item "$prefixPath\opt\bin\" -ItemType Directory -ErrorAction 0
+                Transfer-File -Src "c:\opt\bin\flanneld.exe" -Dst "$prefixPath\opt\bin\flanneld.exe"
+            }
 
             $winsArgs = $($flannelArgs -join ' ')
             Log-Info "Start flanneld with: $winsArgs"
-            wins.exe cli prc run --path "c:\opt\bin\flanneld.exe" --exposes ("UDP:{0}" -f $port) --args "$winsArgs" --envs "NODE_NAME=$nodeName"
+            wins.exe cli prc run --path "$prefixPath\opt\bin\flanneld.exe" --exposes ("UDP:{0}" -f $port) --args "$winsArgs" --envs "NODE_NAME=$nodeName"
         }
     }
 
     exit 0
 }
 
-Log-Warn "Could not found network configuration from RKE"
+Log-Warn "Could not find network configuration from RKE"
 ping -t 127.0.0.1 | Out-Null

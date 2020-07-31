@@ -5,7 +5,6 @@ $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
 Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
-
 function Normal-Format
 {
     param (
@@ -15,7 +14,7 @@ function Normal-Format
     return $Val.ToLower() -replace '_','-'
 }
 
-$sslCertsDir = "c:\etc\kuberentes\ssl"
+$sslCertsDir = "c:\etc\kubernetes\ssl" # dir on the container
 Create-Directory -Path $sslCertsDir
 
 # output pem file

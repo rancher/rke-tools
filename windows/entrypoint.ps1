@@ -124,6 +124,11 @@ if ($cloudProviderName)
 # append passed arguments
 $prcArgs += @(Fix-LegacyArgument -ArgumentList $args[1..$args.Length])
 
+$prefixPath = $env:RKE_NODE_PREFIX_PATH
+if ($prefixPath -eq "") {
+	$prefixPath = "c:\"
+}
+
 # deal with the command
 $command = $args[0]
 switch ($command) 
@@ -173,8 +178,13 @@ switch ($command)
 
         Create-Directory -Path "c:\host\etc\kubernetes\bin"
         Transfer-File -Src "c:\etc\kubernetes\bin\kubelet.exe" -Dst "c:\host\etc\kubernetes\bin\kubelet.exe"
+        if ($prefixPath -ne "c:\") {
+            # copy internally tothe prefix path location so wins can find it
+            New-Item "$prefixPath\etc\kubernetes\bin\" -ItemType Directory -ErrorAction 0
+            Transfer-File -Src "c:\etc\kubernetes\bin\kubelet.exe" -Dst "$prefixPath\etc\kubernetes\bin\kubelet.exe"
+        }
 
-        $prcPath = "c:\etc\kubernetes\bin\kubelet.exe"
+        $prcPath = "$prefixPath\etc\kubernetes\bin\kubelet.exe"
         $prcExposes = "TCP:10250"
     }
 
@@ -215,8 +225,13 @@ switch ($command)
 
         Create-Directory -Path "c:\host\etc\kubernetes\bin"
         Transfer-File -Src "c:\etc\kubernetes\bin\kube-proxy.exe" -Dst "c:\host\etc\kubernetes\bin\kube-proxy.exe"
+        if ($prefixPath -ne "c:\") {
+            # copy internally to the prefix path location so wins can find it
+            New-Item "$prefixPath\etc\kubernetes\bin\" -ItemType Directory -ErrorAction 0
+            Transfer-File -Src "c:\etc\kubernetes\bin\kube-proxy.exe" -Dst "$prefixPath\etc\kubernetes\bin\kube-proxy.exe"
+        }
 
-        $prcPath = "c:\etc\kubernetes\bin\kube-proxy.exe"
+        $prcPath = "$prefixPath\etc\kubernetes\bin\kube-proxy.exe"
         $prcExposes = "TCP:10256"
     }
 
