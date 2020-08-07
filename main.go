@@ -411,6 +411,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 				"error": err,
 				"data":  string(data),
 			}).Warn("Checking member health failed from etcd member")
+			err = fmt.Errorf("%s: %v", err, string(data))
 			continue
 		}
 
@@ -431,17 +432,19 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 				"error":   err,
 				"data":    string(data),
 			}).Warn("Backup failed")
+			err = fmt.Errorf("%s: %v", err, string(data))
 			continue
 		}
 		// Determine how many files need to be in the compressed file
 		// 1. the compressed file
 		toCompressFiles := []string{backupFile}
 		// 2. the state file if present
-		if _, err := os.Stat(stateFile); err == nil {
+		if _, err = os.Stat(stateFile); err == nil {
 			toCompressFiles = append(toCompressFiles, stateFile)
 		}
 		// Create compressed file
-		compressedFilePath, err := compressFiles(backupFile, toCompressFiles)
+		var compressedFilePath string
+		compressedFilePath, err = compressFiles(backupFile, toCompressFiles)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"attempt": retries + 1,
@@ -459,10 +462,11 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 				"error":   err,
 				"data":    string(data),
 			}).Warn("Removing uncompressed snapshot file failed")
+			continue
 
 		}
 		// Remove the state file after succesfully compressing it
-		if _, err := os.Stat(stateFile); err == nil {
+		if _, err = os.Stat(stateFile); err == nil {
 			err = os.Remove(stateFile)
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -470,7 +474,6 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 					"error":   err,
 					"data":    string(data),
 				}).Warn("Removing statefile failed")
-
 			}
 		}
 
@@ -485,6 +488,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 				"error":   err,
 				"data":    string(data),
 			}).Warn("changing permission of the compressed snapshot failed")
+			continue
 		}
 
 		if server.Backup {
@@ -498,10 +502,6 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			}
 		}
 		break
-	}
-	// Include the cmd output (data) into the error
-	if err != nil {
-		return fmt.Errorf("%s: %v", err, string(data))
 	}
 	return err
 }
