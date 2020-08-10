@@ -11,6 +11,11 @@ $InformationPreference = 'SilentlyContinue'
 
 Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
 
+$prefixPath = $env:RKE_NODE_PREFIX_PATH
+if ($prefixPath -eq "") {
+    $prefixPath = "c:\"
+}
+
 confd.exe -onetime -backend env -log-level error
 if (-not $?) {
     Log-Fatal "Failed to generate nginx configuration"
@@ -18,5 +23,10 @@ if (-not $?) {
 
 Create-Directory -Path "c:\host\etc\nginx"
 Transfer-File -Src "c:\etc\nginx\nginx.exe" -Dst "c:\host\etc\nginx\nginx.exe"
+if ($prefixPath -ne "c:\") {
+    # for wins to find
+    New-Item "$prefixPath\etc\nginx\" -ItemType Directory -ErrorAction 0
+    Transfer-File -Src "c:\etc\nginx\nginx.exe" -Dst "$prefixPath\etc\nginx\nginx.exe"
+}
 
-wins.exe cli prc run --path "c:\etc\nginx\nginx.exe"
+wins.exe cli prc run --path "$prefixPath\etc\nginx\nginx.exe"
