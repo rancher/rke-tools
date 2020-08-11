@@ -12,7 +12,7 @@ $InformationPreference = 'SilentlyContinue'
 Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
 
 $prefixPath = $env:RKE_NODE_PREFIX_PATH
-if ($prefixPath -eq "") {
+if ([string]::IsNullOrEmpty($prefixPath)) {
     $prefixPath = "c:\"
 }
 
