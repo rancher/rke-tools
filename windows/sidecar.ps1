@@ -229,7 +229,7 @@ if ($networkConfigObj)
     {
         "flannel" {
             $prefixPath = $env:RKE_NODE_PREFIX_PATH
-            if ($prefixPath -eq "") {
+            if ([string]::IsNullOrEmpty($prefixPath)) {
                 $prefixPath = "c:\"
             }
 

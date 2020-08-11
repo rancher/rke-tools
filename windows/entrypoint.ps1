@@ -125,7 +125,7 @@ if ($cloudProviderName)
 $prcArgs += @(Fix-LegacyArgument -ArgumentList $args[1..$args.Length])
 
 $prefixPath = $env:RKE_NODE_PREFIX_PATH
-if ($prefixPath -eq "") {
+if ([string]::IsNullOrEmpty($prefixPath)) {
 	$prefixPath = "c:\"
 }
 
