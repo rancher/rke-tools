@@ -2,9 +2,11 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -35,6 +37,7 @@ const (
 	serverPort            = "2379"
 	s3Endpoint            = "s3.amazonaws.com"
 	tmpStateFilePath      = "/tmp/cluster.rkestate"
+	failureInterval       = 15 * time.Second
 )
 
 var commonFlags = []cli.Flag{
@@ -377,7 +380,17 @@ func SaveBackupAction(c *cli.Context) error {
 		select {
 		case backupTime := <-backupTicker.C:
 			backupName := fmt.Sprintf("%s_etcd", backupTime.Format(time.RFC3339))
-			if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err == nil {
+			err := retrieveAndWriteStatefile(backupName)
+			if err != nil {
+				// An error on statefile retrieval is not a reason to bail out
+				// Having a snapshot without a statefile is more valuable than not having a snapshot at all
+				log.WithFields(log.Fields{
+					"name":  backupName,
+					"error": err,
+				}).Warn("Error while trying to retrieve cluster state from cluster")
+
+			}
+			if err = CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err == nil {
 				DeleteBackups(backupTime, retentionPeriod)
 				if s3Backup {
 					DeleteS3Backups(backupTime, retentionPeriod, client, bc)
@@ -388,7 +401,6 @@ func SaveBackupAction(c *cli.Context) error {
 }
 
 func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints string, svc *minio.Client, server *backupConfig) error {
-	failureInterval := 15 * time.Second
 	backupFile := fmt.Sprintf("%s/%s", backupBaseDir, backupName)
 	stateFile := fmt.Sprintf("%s/%s.%s", k8sBaseDir, backupName, clusterStateExtension)
 	var err error
@@ -1250,4 +1262,77 @@ func AddFileToZip(zipWriter *zip.Writer, filename string) error {
 	}
 	_, err = io.Copy(writer, fileToZip)
 	return err
+}
+
+func retrieveAndWriteStatefile(backupName string) error {
+	log.WithFields(log.Fields{
+		"name": backupName,
+	}).Debug("retrieveAndWriteStatefile called")
+
+	var out bytes.Buffer
+	var err error
+	for retries := 0; retries <= backupRetries; retries++ {
+		log.WithFields(log.Fields{
+			"attempt": retries + 1,
+			"name":    backupName,
+		}).Info("Trying to retrieve configmap full-cluster-state using kubectl")
+
+		if retries > 0 {
+			time.Sleep(failureInterval)
+		}
+
+		// Try to retrieve cluster state to include in snapshot
+		cmd := exec.Command("/usr/local/bin/kubectl", "--request-timeout=30s", "--kubeconfig", "/etc/kubernetes/ssl/kubecfg-kube-node.yaml", "-n", "kube-system", "get", "configmap", "full-cluster-state", "-o", "json")
+		var stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		err = cmd.Run()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"attempt": retries + 1,
+				"name":    backupName,
+				"err":     fmt.Sprintf("%s: %s", err, stderr.String()),
+			}).Warn("Failed to retrieve configmap full-cluster-state using kubectl")
+			if retries >= backupRetries {
+				return fmt.Errorf("Failed to retrieve configmap full-cluster-state using kubectl: %v", fmt.Sprintf("%s: %s", err, stderr.String()))
+			}
+			continue
+		}
+		break
+	}
+	var m map[string]interface{}
+	err = json.Unmarshal(out.Bytes(), &m)
+	if err != nil {
+		return fmt.Errorf("Failed to unmarshal cluster state from configmap full-cluster-state: %v", err)
+	}
+
+	var jsondata map[string]interface{}
+	var fullClusterState string
+	if _, ok := m["data"]; ok {
+		jsondata = m["data"].(map[string]interface{})
+	}
+	if str, ok := jsondata["full-cluster-state"].(string); ok {
+		fullClusterState = str
+	}
+
+	var prettyFullClusterState bytes.Buffer
+	err = json.Indent(&prettyFullClusterState, []byte(fullClusterState), "", "  ")
+	if err != nil {
+		return fmt.Errorf("Failed to indent JSON for state file: %v", err)
+	}
+	stateFilePath := fmt.Sprintf("/etc/kubernetes/%s.rkestate", backupName)
+	f, err := os.Create(stateFilePath)
+	if err != nil {
+		return fmt.Errorf("Failed to create state file [%s]: %v", stateFilePath, err)
+	}
+	defer f.Close()
+	_, err = f.Write(prettyFullClusterState.Bytes())
+	if err != nil {
+		return fmt.Errorf("Failed to write state file [%s]: %v", stateFilePath, err)
+	}
+	log.WithFields(log.Fields{
+		"filepath": stateFilePath,
+	}).Info("Successfully written state file content to file")
+
+	return nil
 }
