@@ -228,6 +228,9 @@ function Get-NodeOverridedName
 
         if ($nodeName) {
             $nodeName = $nodeName.Trim()
+            if ($nodeName -match " ") {
+                $nodeName = $nodeName.split(" ")[0] # take the first to be safe
+            }
             $nodeName | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cloud-provider-override-hostname"
             Log-Info "Got overriding hostname $nodeName from metadata"
         }
