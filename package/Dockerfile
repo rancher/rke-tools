@@ -14,6 +14,8 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && chmod +x /usr/bin/confd \
     && curl -sLf ${!DOCKER_URL} | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 docker/docker \
     && chmod +x /opt/rke-tools/bin/docker \
+    && curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.18.2/bin/linux/${ARCH}/kubectl > /usr/local/bin/kubectl \
+    && chmod +x /usr/local/bin/kubectl \
     && apk del curl
 
 RUN mkdir -p /opt/cni/bin
