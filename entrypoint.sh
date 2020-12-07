@@ -12,9 +12,9 @@ if echo ${@} | grep -q "cloud-provider=azure"; then
   fi
 fi
 
-DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info 2>&1  | grep -i 'docker root dir' | cut -f2 -d:)
-DOCKER_DIRS=$(find -O1 $DOCKER_ROOT -maxdepth 1) # used to exclude mounts that are subdirectories of $DOCKER_ROOT to ensure we don't unmount mounted filesystems on sub directories
 if [ "$1" = "kubelet" ]; then
+    DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info 2>&1  | grep -i 'docker root dir' | cut -f2 -d:)
+    DOCKER_DIRS=$(find -O1 $DOCKER_ROOT -maxdepth 1) # used to exclude mounts that are subdirectories of $DOCKER_ROOT to ensure we don't unmount mounted filesystems on sub directories
     for i in $DOCKER_ROOT /var/lib/docker /run /var/run; do
         for m in $(tac /proc/mounts | awk '{print $2}' | grep ^${i}/); do
             if [ "$m" != "/var/run/nscd" ] && [ "$m" != "/run/nscd" ] && ! echo $DOCKER_DIRS | grep -qF "$m"; then
