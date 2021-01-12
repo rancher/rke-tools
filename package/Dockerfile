@@ -8,9 +8,10 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.12.3.tg
 RUN apk -U --no-cache add bash \
     && rm -f /bin/sh \
     && ln -s /bin/bash /bin/sh
+ENV RANCHER_CONFD_VERSION=v0.16.2    
 RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && mkdir -p /opt/rke-tools/bin /etc/confd \
-    && curl -sLf https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-linux-${ARCH} > /usr/bin/confd \
+    && curl -sLf https://github.com/rancher/confd/releases/download/${RANCHER_CONFD_VERSION}/confd-${RANCHER_CONFD_VERSION}-linux-${ARCH} > /usr/bin/confd \
     && chmod +x /usr/bin/confd \
     && curl -sLf ${!DOCKER_URL} | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 docker/docker \
     && chmod +x /opt/rke-tools/bin/docker \
