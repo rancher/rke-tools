@@ -1,0 +1,129 @@
+ARG SERVERCORE_VERSION
+
+FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} as builder
+ARG ARCH=amd64
+SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN if (-not (Get-Command Expand-7Zip -ErrorAction Ignore)) { \
+       Install-PackageProvider -Name NuGet -Force -Verbose; \
+       Install-Module -Name 7Zip4Powershell -Repository PSGallery -Force -Verbose; \
+       if(-not $?) { \
+            Write-Error "Failed to install package"; \
+            Exit 1; \
+       } \
+    }
+# download confd
+RUN $URL = 'https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-windows-amd64.exe'; \
+    \
+    Write-Host ('Downloading confd from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\confd.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# download nginx
+RUN $URL = 'http://nginx.org/download/nginx-1.15.9.zip'; \
+    \
+    Write-Host ('Downloading nginx from {0} ...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\nginx.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\nginx.zip -DestinationPath c:\; \
+    \
+    Write-Host 'Complete.'
+# download cni plugins
+RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.8.2/cni-plugins-windows-amd64-v0.8.2.tgz'; \
+    \
+    function DeGZip-File ($inFile, $outFile) { \
+        $input = New-Object System.IO.FileStream $inFile, ([IO.FileMode]::Open), ([IO.FileAccess]::Read), ([IO.FileShare]::Read); \
+        $output = New-Object System.IO.FileStream $outFile, ([IO.FileMode]::Create), ([IO.FileAccess]::Write), ([IO.FileShare]::None); \
+        $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::Decompress); \
+        try { \
+            if (!$input -or !$output -or !$gzipStream) { \
+                Write-Error "Failed to Unzip the archive"; \
+                Exit 1; \
+            } \
+            $buffer = New-Object byte[](1024); \
+            while ($true) { \
+                $read = $gzipstream.Read($buffer, 0, 1024); \
+                if ($read -le 0 ) { \
+                    break; \
+                } \
+                $output.Write($buffer, 0, $read); \
+            } \
+        } finally { \
+            $gzipStream.Close(); \
+            $output.Close(); \
+            $input.Close(); \
+        } \
+    }; \
+    \
+    Write-Host ('Downloading cni plugins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\containernetworking-plugins.tarz -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    DeGZip-File c:\containernetworking-plugins.tarz c:\containernetworking-plugins.tar; \
+    Expand-7Zip c:\containernetworking-plugins.tar c:\containernetworking\bin\.; \
+    \
+    Write-Host 'Complete.'
+# download flanneld
+RUN $URL = 'https://github.com/luthermonson/flannel/releases/download/v0.12.0-rancher1/flanneld.exe'; \
+	New-Item -Path c:\ -Name "flanneld" -ItemType "directory"; \
+    Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\flanneld\flanneld.exe -Uri $URL; \
+    Write-Host 'Complete.'
+# download flexvolume plugins
+RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V0.0.3/flexvolume-windows.zip'; \
+    \
+    Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\flexvolume.zip -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    Expand-Archive -Force -Path c:\flexvolume.zip -DestinationPath c:\flexvolume\.; \
+    \
+    Write-Host 'Complete.'
+# download wins
+RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.0.4/wins.exe'; \
+    \
+    Write-Host ('Downloading wins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\wins.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# download GetGcePdName.dll
+# this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
+RUN $URL = 'https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll'; \
+    \
+    Write-Host ('Downloading GetGcePdName DLL from {0}...'  -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\GetGcePdName.dll -Uri $URL; \
+    \
+    Write-Host 'Complete.';
+
+# FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
+# USER ContainerAdministrator
+# COPY --from=builder /Windows/System32/netapi32.dll /Windows/System32/
+RUN Move-Item -Path /wins.exe -Destination /Windows/
+RUN Move-Item -Path /confd.exe -Destination /Windows/
+RUN New-Item -Force -ItemType Directory -Path /etc; \
+    Move-Item -Path /nginx-1.15.9 -Destination /etc/nginx
+RUN New-Item -Force -ItemType Directory -Path /opt; \
+    New-Item -Force -ItemType Directory -Path /opt/cni; \
+    New-Item -Force -ItemType Directory -Path /opt/bin; \
+    New-Item -Force -ItemType Directory -Path /opt/cni/bin; \
+    Move-Item -Path /containernetworking/bin/*.exe -Destination /opt/cni/bin/; \
+    Move-Item -Path /flanneld/flanneld.exe -Destination /opt/bin/
+RUN New-Item -Force -ItemType Directory -Path /share; \
+    New-Item -Force -ItemType Directory -Path /gce-patch; \
+    New-Item -Force -ItemType Directory -Path /share/kubelet-volumeplugins; \
+    Move-Item -Path /flexvolume -Destination /share/kubelet-volumeplugins; \
+    Move-Item -Path /GetGcePdName.dll -Destination /share/gce-patch/
+COPY windows/templates /etc/confd/templates/
+COPY windows/conf.d /etc/confd/conf.d/
+COPY windows/sidecar.ps1 windows/nginx-proxy.ps1 windows/cert-deployer.ps1 windows/*.psm1 /usr/bin/
+COPY windows/entrypoint.ps1 windows/*.psm1 /share/scripts/
+VOLUME c:/opt/rke-tools
+VOLUME c:/run
+ENTRYPOINT ["powershell.exe", "-NoLogo"]

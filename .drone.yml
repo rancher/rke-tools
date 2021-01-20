@@ -280,7 +280,7 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      dockerfile: package/Dockerfile.windows
+      dockerfile: package/Dockerfile.windows.20H2
       build_args:
         - SERVERCORE_VERSION=20H2
       repo: rancher/rke-tools
