@@ -120,7 +120,9 @@ RUN New-Item -Force -ItemType Directory -Path /share; \
     New-Item -Force -ItemType Directory -Path /share/kubelet-volumeplugins; \
     Move-Item -Path /flexvolume -Destination /share/kubelet-volumeplugins; \
     Move-Item -Path /GetGcePdName.dll -Destination /share/gce-patch/
-RUN New-Alias -Name pwsh -Value powershell
+RUN $t = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"; \
+    $p = "C:\Windows\System32\WindowsPowerShell\v1.0\pwsh.exe"; \
+    New-Item -ItemType SymbolicLink -Target $t -Path $p
 COPY windows/templates /etc/confd/templates/
 COPY windows/conf.d /etc/confd/conf.d/
 COPY windows/sidecar.ps1 windows/nginx-proxy.ps1 windows/cert-deployer.ps1 windows/*.psm1 /usr/bin/
