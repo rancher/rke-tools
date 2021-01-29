@@ -211,7 +211,7 @@ if ($networkConfigObj)
                         delegate = $cniConfDelegate
                     }
                 )
-            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\host\etc\cni\net.d\10-flannel.conflist"
+            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Force -FilePath "c:\host\etc\cni\net.d\10-flannel.conflist"
 
         }
 
@@ -220,7 +220,7 @@ if ($networkConfigObj)
 }
 
 # output cni informantion for kube-proxy
-$cniInfo | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cni-info.json"
+$cniInfo | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Force -FilePath "c:\run\cni-info.json"
 
 # start cni management
 if ($networkConfigObj) 
@@ -263,7 +263,7 @@ if ($networkConfigObj)
                     VNI  = $vni
                     Port = $port
                 }
-            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\host\etc\kube-flannel\net-conf.json"
+            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Force -FilePath "c:\host\etc\kube-flannel\net-conf.json"
 
             $flannelArgs = @(
                 # could not use kubernetes in-cluster client, indicate kubeconfig instead
