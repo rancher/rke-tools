@@ -140,7 +140,7 @@ function Complete-AzureCloudConfig
         $azCloudConfig = $azCloudConfig | Add-Member -Force -NotePropertyMembers $azCloudConfigOverrided -PassThru
 
         # output
-        $azCloudConfig | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath $CloudConfigPath
+        $azCloudConfig | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8NoBOM -Force -FilePath $CloudConfigPath
         Log-Info "Completed Azure cloud configuration successfully"
     }
     catch 
@@ -231,7 +231,7 @@ function Get-NodeOverridedName
             if ($nodeName -match " ") {
                 $nodeName = $nodeName.split(" ")[0] # take the first to be safe
             }
-            $nodeName | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cloud-provider-override-hostname"
+            $nodeName | Out-File -NoNewline -Encoding utf8NoBOM -Force -FilePath "c:\run\cloud-provider-override-hostname"
             Log-Info "Got overriding hostname $nodeName from metadata"
         }
     }
