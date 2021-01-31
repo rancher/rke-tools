@@ -8,6 +8,7 @@ $WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 
 Import-Module -WarningAction Ignore -Name @(
     "$PSScriptRoot\utils.psm1"
@@ -162,7 +163,7 @@ switch ($command)
             $kubeletDockerConfigB64 = $env:RKE_KUBELET_DOCKER_CONFIG
             if ($kubeletDockerConfigB64) {
                 $kubeletDockerConfig = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($kubeletDockerConfigB64))
-                $kubeletDockerConfig | Out-File -NoNewline -Force -FilePath "c:\host\var\lib\kubelet\config.json"
+                [System.IO.File]::WriteAllLines("c:\host\var\lib\kubelet\config.json", $kubeletDockerConfig, $Utf8NoBomEncoding)
             }
         } catch{
             Log-Warn "Could not put private registry Docker configuration to the host: $($_.Exception.Message)"

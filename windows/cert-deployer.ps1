@@ -3,6 +3,7 @@ $WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 
 Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
 function Normal-Format
@@ -24,7 +25,7 @@ Get-ChildItem Env: | Select-Object -Property Key,Value | Where-Object {$_.Key -c
 
     $path = "$sslCertsDir\$($key | Normal-Format).pem"
     if ((-not (Exist-File -Path $path)) -or ($env:FORCE_DEPLOY -eq "true")) {
-        $val | Out-File -NoNewline -Encoding ascii -Force -FilePath $path
+        [System.IO.File]::WriteAllLines($path, $val, $Utf8NoBomEncoding)
     }
 }
 Log-Info "Outputted PEM files for Kubernetes components"
@@ -36,7 +37,7 @@ Get-ChildItem Env: | Select-Object -Property Key,Value | Where-Object {$_.Key -c
 
     $path = "$sslCertsDir\$($key | Normal-Format).yaml"
     if (-not (Exist-File -Path $path)) {
-        $val | Out-File -NoNewline -Encoding ascii -Force -FilePath $path
+        [System.IO.File]::WriteAllLines($path, $val, $Utf8NoBomEncoding)
     }
 }
 Log-Info "Outputted YAML files for Kubernetes components"
