@@ -3,6 +3,7 @@ $WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 
 function Complete-AzureCloudConfig 
 {
@@ -140,7 +141,8 @@ function Complete-AzureCloudConfig
         $azCloudConfig = $azCloudConfig | Add-Member -Force -NotePropertyMembers $azCloudConfigOverrided -PassThru
 
         # output
-        $azCloudConfig | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Force -FilePath $CloudConfigPath
+        $azCloudConfigJson = $azCloudConfig | ConvertTo-Json -Compress -Depth 32
+        [System.IO.File]::WriteAllLines($CloudConfigPath, $azCloudConfigJson, $Utf8NoBomEncoding)
         Log-Info "Completed Azure cloud configuration successfully"
     }
     catch 
@@ -231,7 +233,7 @@ function Get-NodeOverridedName
             if ($nodeName -match " ") {
                 $nodeName = $nodeName.split(" ")[0] # take the first to be safe
             }
-            $nodeName | Out-File -NoNewline -Force -FilePath "c:\run\cloud-provider-override-hostname"
+            [System.IO.File]::WriteAllLines("c:\run\cloud-provider-override-hostname", $nodeName, $Utf8NoBomEncoding)
             Log-Info "Got overriding hostname $nodeName from metadata"
         }
     }
