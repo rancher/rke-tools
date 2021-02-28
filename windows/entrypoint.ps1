@@ -163,7 +163,7 @@ switch ($command)
             $kubeletDockerConfigB64 = $env:RKE_KUBELET_DOCKER_CONFIG
             if ($kubeletDockerConfigB64) {
                 $kubeletDockerConfig = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($kubeletDockerConfigB64))
-                [System.IO.File]::WriteAllLines("c:\host\var\lib\kubelet\config.json", $kubeletDockerConfig, $Utf8NoBomEncoding)
+                [System.IO.File]::WriteAllText("c:\host\var\lib\kubelet\config.json", $kubeletDockerConfig, $Utf8NoBomEncoding)
             }
         } catch{
             Log-Warn "Could not put private registry Docker configuration to the host: $($_.Exception.Message)"
