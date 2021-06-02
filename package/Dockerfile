@@ -1,4 +1,4 @@
-FROM nginx:1.18.0-alpine
+FROM nginx:1.20.1-alpine
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
 ARG ARCH=amd64
@@ -23,10 +23,9 @@ RUN mkdir -p /opt/cni/bin
 RUN wget -q -O - https://github.com/containernetworking/cni/releases/download/v0.4.0/cni-${ARCH}-v0.4.0.tgz | tar xzf - -C /tmp
 RUN wget -q -O /tmp/portmap https://github.com/rancher/plugins/releases/download/v1.9.1-rancher1/portmap-${ARCH}
 
-ENV ETCD_URL_amd64=https://github.com/coreos/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-amd64.tar.gz \
-    ETCD_URL_arm64=https://github.com/etcd-io/etcd/releases/download/v3.3.10/etcd-v3.3.10-linux-arm64.tar.gz \
-    ETCD_URL=ETCD_URL_${ARCH}
-RUN wget -q -O - ${!ETCD_URL} | tar xzf - -C /tmp && \
+ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-${ARCH}.tar.gz
+
+RUN wget -q -O - ${ETCD_URL} | tar xzf - -C /tmp && \
     mv /tmp/etcd-*/etcdctl /usr/local/bin/etcdctl && \
     rm -rf /tmp/etcd-* && rm -f /etcd-*.tar.gz && \
     apk del wget
