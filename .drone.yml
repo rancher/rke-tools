@@ -37,6 +37,7 @@ steps:
         - ARCH=amd64
       repo: rancher/rke-tools
       tag: "${DRONE_TAG}-linux-amd64"
+      no_cache: true
     when:
       instance:
       - drone-publish.rancher.io
@@ -89,6 +90,7 @@ steps:
         - ARCH=arm64
       repo: rancher/rke-tools
       tag: "${DRONE_TAG}-linux-arm64"
+      no_cache: true
     when:
       instance:
       - drone-publish.rancher.io

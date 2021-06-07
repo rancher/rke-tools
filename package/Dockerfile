@@ -5,7 +5,8 @@ ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.12.3.tgz \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.12.3/docker-v1.12.3_arm64.tgz \
     DOCKER_URL=DOCKER_URL_${ARCH}
-RUN apk -U --no-cache add bash \
+RUN apk -U upgrade \
+    && apk -U --no-cache add bash \
     && rm -f /bin/sh \
     && ln -s /bin/bash /bin/sh
 ENV RANCHER_CONFD_VERSION=v0.16.2    
