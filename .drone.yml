@@ -13,13 +13,17 @@ steps:
         path: /var/run/docker.sock
     commands:
       - dapper ci
+    when:
+      refs:
+      - refs/head/master
+      event:
+      - push
+      - pull_request
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
       - cp -r ./bin/* ./
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -39,8 +43,6 @@ steps:
       tag: "${DRONE_TAG}-linux-amd64"
       no_cache: true
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -66,13 +68,17 @@ steps:
         path: /var/run/docker.sock
     commands:
       - dapper ci
+    when:
+      refs:
+      - refs/head/master
+      event:
+      - push
+      - pull_request
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
       - cp -r ./bin/* ./
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -92,8 +98,6 @@ steps:
       tag: "${DRONE_TAG}-linux-arm64"
       no_cache: true
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -129,8 +133,6 @@ steps:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -172,8 +174,6 @@ steps:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      instance:
-        - drone-publish.rancher.io
       refs:
         - refs/head/master
         - refs/tags/*
@@ -216,8 +216,6 @@ steps:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      instance:
-        - drone-publish.rancher.io
       refs:
         - refs/head/master
         - refs/tags/*
@@ -241,8 +239,6 @@ steps:
         from_secret: docker_password
       spec: manifest.tmpl
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
