@@ -16,9 +16,11 @@ steps:
     when:
       refs:
       - refs/head/master
+      - refs/tags/*
       event:
       - push
       - pull_request
+      - tag
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
@@ -71,9 +73,11 @@ steps:
     when:
       refs:
       - refs/head/master
+      - refs/tags/*
       event:
       - push
       - pull_request
+      - tag
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
