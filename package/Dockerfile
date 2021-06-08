@@ -5,6 +5,7 @@ ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.12.3.tgz \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.12.3/docker-v1.12.3_arm64.tgz \
     DOCKER_URL=DOCKER_URL_${ARCH}
+ENV CRIDOCKERD_URL=https://github.com/rancher/cri-dockerd/releases/download/v0.0.2/cri-dockerd-v0.0.2-linux-${ARCH}.tgz
 RUN apk -U upgrade \
     && apk -U --no-cache add bash \
     && rm -f /bin/sh \
@@ -15,7 +16,8 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && curl -sLf https://github.com/rancher/confd/releases/download/${RANCHER_CONFD_VERSION}/confd-${RANCHER_CONFD_VERSION}-linux-${ARCH} > /usr/bin/confd \
     && chmod +x /usr/bin/confd \
     && curl -sLf ${!DOCKER_URL} | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 docker/docker \
-    && chmod +x /opt/rke-tools/bin/docker \
+    && curl -sLf ${CRIDOCKERD_URL} | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 cri-dockerd/cri-dockerd \
+    && chmod +x /opt/rke-tools/bin/cri-dockerd \
     && curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.18.2/bin/linux/${ARCH}/kubectl > /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubectl \
     && apk del curl

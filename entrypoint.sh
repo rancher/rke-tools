@@ -70,8 +70,23 @@ if [ "$1" = "kubelet" ]; then
 
     CGROUPDRIVER=$(/opt/rke-tools/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
 
-    # final step for kubelet
-    exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF
+    # separate flow for cri-dockerd to minimize change to the existing way we run kubelet
+    if [ "${RKE_KUBELET_CRIDOCKERD}" == "true" ]; then
+        /opt/rke-tools/bin/cri-dockerd &
+
+        # wait for cri-dockerd to start as kubelet depends on it
+        echo "Sleeping 10 waiting for cri-dockerd to start"
+        sleep 10
+
+        # start kubelet
+        exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF &
+
+        # waiting for either cri-dockerd or kubelet to crash and exit so it can be restarted
+        wait -n
+    else
+        # start kubelet
+        exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF
+    fi
 fi
 
 exec "$@"
