@@ -33,7 +33,7 @@ set_azure_config() {
   az cloud set --name ${azure_cloud}
 
   # login to Azure
-  if [ "$az_managed_identity_extension" = "true" ] && [ "${azure_client_secret}" = "" ]; then
+  if [ "${az_managed_identity_extension}" = "true" ] && [ "${azure_client_secret}" = "" ]; then
     echo "using MSI for az login"
     az login --identity 2>&1 > /dev/null
   else
