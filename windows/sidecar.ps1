@@ -9,6 +9,7 @@ $WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 
 Import-Module -WarningAction Ignore -Name @(
     "$PSScriptRoot\utils.psm1"
@@ -199,7 +200,7 @@ if ($networkConfigObj)
                 }
             }
 
-            @{
+            $flannelConflist = @{
                 name = $cniInfo.Interface
                 cniVersion = "0.2.0"
                 plugins = @(
@@ -211,7 +212,8 @@ if ($networkConfigObj)
                         delegate = $cniConfDelegate
                     }
                 )
-            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\host\etc\cni\net.d\10-flannel.conflist"
+            } | ConvertTo-Json -Compress -Depth 32
+            [System.IO.File]::WriteAllText("c:\host\etc\cni\net.d\10-flannel.conflist", $flannelConflist, $Utf8NoBomEncoding)
 
         }
 
@@ -220,7 +222,8 @@ if ($networkConfigObj)
 }
 
 # output cni informantion for kube-proxy
-$cniInfo | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\run\cni-info.json"
+$cniInfoJson = $cniInfo | ConvertTo-Json -Compress -Depth 32
+[System.IO.File]::WriteAllText("c:\run\cni-info.json", $cniInfoJson, $Utf8NoBomEncoding)
 
 # start cni management
 if ($networkConfigObj) 
@@ -255,7 +258,7 @@ if ($networkConfigObj)
                 Log-Warn "Could not patch flannel network configration: $($_.Exception.Message)"
             }
             
-            @{
+            $netConf = @{
                 Network = $clusterCIDR
                 Backend = @{
                     Name = $cniInfo.Interface
@@ -263,7 +266,9 @@ if ($networkConfigObj)
                     VNI  = $vni
                     Port = $port
                 }
-            } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\host\etc\kube-flannel\net-conf.json"
+            } | ConvertTo-Json -Compress -Depth 32
+
+            [System.IO.File]::WriteAllText("c:\host\etc\kube-flannel\net-conf.json", $netConf, $Utf8NoBomEncoding)
 
             $flannelArgs = @(
                 # could not use kubernetes in-cluster client, indicate kubeconfig instead

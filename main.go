@@ -697,11 +697,33 @@ func DeleteBackupAction(c *cli.Context) error {
 	if len(folder) != 0 {
 		name = fmt.Sprintf("%s/%s", folder, name)
 	}
-	for _, p := range []string{name, fmt.Sprintf("%s.%s", name, compressedExtension)} {
-		if err = client.RemoveObject(bc.BucketName, p); err != nil {
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	objectCh := make(<-chan minio.ObjectInfo)
+	// list objects with prefix=name, this will include uncompressed and compressed backup objects
+	if s3utils.IsGoogleEndpoint(*client.EndpointURL()) {
+		log.Info("Endpoint is Google GCS")
+		objectCh = client.ListObjects(bc.BucketName, name, false, doneCh)
+	} else {
+		objectCh = client.ListObjectsV2(bc.BucketName, name, false, doneCh)
+	}
+	var removed []string
+	for object := range objectCh {
+		if object.Err != nil {
+			log.Errorf("failed to list objects in backup buckets [%s]: %v", bc.BucketName, object.Err)
+			return object.Err
+		}
+		log.Infof("deleting object with key: %s that matches prefix: %s", object.Key, name)
+		err = client.RemoveObject(bc.BucketName, object.Key)
+		if err != nil {
 			return err
 		}
+		removed = append(removed, object.Key)
 	}
+
+	log.Infof("removed backups: %s from object store", strings.Join(removed, ", "))
+
 	return nil
 }
 
@@ -730,7 +752,23 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 				bc.Endpoint = s3Endpoint
 			}
 		} else {
-			cred = credentials.NewStatic(bc.AccessKey, bc.SecretKey, "", credentials.SignatureDefault)
+			// Base64 decoding S3 accessKey and secretKey before create static credentials
+			// To be backward compatible, just updating base64 encoded values
+			accessKey := bc.AccessKey
+			secretKey := bc.SecretKey
+			if len(accessKey) > 0 {
+				v, err := base64.StdEncoding.DecodeString(accessKey)
+				if err == nil {
+					accessKey = string(v)
+				}
+			}
+			if len(secretKey) > 0 {
+				v, err := base64.StdEncoding.DecodeString(secretKey)
+				if err == nil {
+					secretKey = string(v)
+				}
+			}
+			cred = credentials.NewStatic(accessKey, secretKey, "", credentials.SignatureDefault)
 		}
 		client, err = minio.NewWithOptions(bc.Endpoint, &minio.Options{
 			Creds:        cred,

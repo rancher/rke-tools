@@ -13,13 +13,19 @@ steps:
         path: /var/run/docker.sock
     commands:
       - dapper ci
+    when:
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - push
+      - pull_request
+      - tag
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
       - cp -r ./bin/* ./
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -37,9 +43,8 @@ steps:
         - ARCH=amd64
       repo: rancher/rke-tools
       tag: "${DRONE_TAG}-linux-amd64"
+      no_cache: true
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -65,13 +70,19 @@ steps:
         path: /var/run/docker.sock
     commands:
       - dapper ci
+    when:
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - push
+      - pull_request
+      - tag
   - name: stage-binaries
     image: rancher/dapper:v0.5.1
     commands:
       - cp -r ./bin/* ./
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -89,9 +100,8 @@ steps:
         - ARCH=arm64
       repo: rancher/rke-tools
       tag: "${DRONE_TAG}-linux-arm64"
+      no_cache: true
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -127,8 +137,6 @@ steps:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -140,16 +148,22 @@ volumes:
       path: \\\\.\\pipe\\docker_engine
 ---
 kind: pipeline
-name: windows-1903
+name: windows-2004
 
 platform:
   os: windows
   arch: amd64
-  version: 1903
+  version: 2004
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
 
 steps:
-  - name: publish-rke-tools-windows-1903
-    image: plugins/docker
+  - name: clone
+    image: luthermonson/drone-git:windows-2004-amd64
+  - name: publish-rke-tools-windows-2004
+    image: luthermonson/drone-docker:2004
     settings:
       username:
         from_secret: docker_username
@@ -157,53 +171,13 @@ steps:
         from_secret: docker_password
       dockerfile: package/Dockerfile.windows
       build_args:
-        - SERVERCORE_VERSION=1903
+        - SERVERCORE_VERSION=2004
       repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-windows-1903"
+      tag: "${DRONE_TAG}-windows-2004"
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      instance:
-      - drone-publish.rancher.io
-      refs:
-      - refs/head/master
-      - refs/tags/*
-      event:
-      - tag
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
----
-kind: pipeline
-name: windows-1909
-
-platform:
-  os: windows
-  arch: amd64
-  version: 1909
-
-steps:
-  - name: publish-rke-tools-windows-1909
-    image: plugins/docker
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      dockerfile: package/Dockerfile.windows
-      build_args:
-        - SERVERCORE_VERSION=1909
-      repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-windows-1909"
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      instance:
-        - drone-publish.rancher.io
       refs:
         - refs/head/master
         - refs/tags/*
@@ -214,6 +188,47 @@ volumes:
     host:
       path: \\\\.\\pipe\\docker_engine
 
+---
+kind: pipeline
+name: windows-20H2
+
+platform:
+  os: windows
+  arch: amd64
+  version: 20H2
+
+# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+clone:
+  disable: true
+
+steps:
+  - name: clone
+    image: luthermonson/drone-git:windows-20H2-amd64
+  - name: publish-rke-tools-windows-20H2
+    image: luthermonson/drone-docker:20H2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      dockerfile: package/Dockerfile.windows.20H2
+      build_args:
+        - SERVERCORE_VERSION=20H2
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-windows-20H2"
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      refs:
+        - refs/head/master
+        - refs/tags/*
+      event:
+        - tag
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
 ---
 kind: pipeline
 name: manifest
@@ -228,8 +243,6 @@ steps:
         from_secret: docker_password
       spec: manifest.tmpl
     when:
-      instance:
-      - drone-publish.rancher.io
       refs:
       - refs/head/master
       - refs/tags/*
@@ -239,5 +252,5 @@ depends_on:
 - linux-amd64
 - linux-arm64
 - windows-1809
-- windows-1903
-- windows-1909
+- windows-2004
+- windows-20H2
