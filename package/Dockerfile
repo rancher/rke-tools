@@ -10,7 +10,7 @@ RUN apk -U upgrade \
     && apk -U --no-cache add bash \
     && rm -f /bin/sh \
     && ln -s /bin/bash /bin/sh
-ENV RANCHER_CONFD_VERSION=v0.16.2    
+ENV RANCHER_CONFD_VERSION=v0.16.4
 RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && mkdir -p /opt/rke-tools/bin /etc/confd \
     && curl -sLf https://github.com/rancher/confd/releases/download/${RANCHER_CONFD_VERSION}/confd-${RANCHER_CONFD_VERSION}-linux-${ARCH} > /usr/bin/confd \
