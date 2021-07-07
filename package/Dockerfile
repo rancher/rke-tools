@@ -1,16 +1,16 @@
-FROM nginx:1.20.1-alpine
+FROM nginx:1.21.0-alpine
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
 ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.12.3.tgz \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.12.3/docker-v1.12.3_arm64.tgz \
     DOCKER_URL=DOCKER_URL_${ARCH}
-ENV CRIDOCKERD_URL=https://github.com/rancher/cri-dockerd/releases/download/v0.0.2/cri-dockerd-v0.0.2-linux-${ARCH}.tgz
+ENV CRIDOCKERD_URL=https://github.com/rancher/cri-dockerd/releases/download/v0.0.3/cri-dockerd-v0.0.3-linux-${ARCH}.tgz
 RUN apk -U upgrade \
     && apk -U --no-cache add bash \
     && rm -f /bin/sh \
     && ln -s /bin/bash /bin/sh
-ENV RANCHER_CONFD_VERSION=v0.16.2    
+ENV RANCHER_CONFD_VERSION=v0.16.4
 RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && mkdir -p /opt/rke-tools/bin /etc/confd \
     && curl -sLf https://github.com/rancher/confd/releases/download/${RANCHER_CONFD_VERSION}/confd-${RANCHER_CONFD_VERSION}-linux-${ARCH} > /usr/bin/confd \
