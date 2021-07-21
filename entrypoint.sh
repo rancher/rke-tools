@@ -72,7 +72,7 @@ if [ "$1" = "kubelet" ]; then
 
     # separate flow for cri-dockerd to minimize change to the existing way we run kubelet
     if [ "${RKE_KUBELET_CRIDOCKERD}" == "true" ]; then
-        /opt/rke-tools/bin/cri-dockerd &
+        /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" &
 
         # wait for cri-dockerd to start as kubelet depends on it
         echo "Sleeping 10 waiting for cri-dockerd to start"
