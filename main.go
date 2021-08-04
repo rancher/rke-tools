@@ -752,23 +752,7 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 				bc.Endpoint = s3Endpoint
 			}
 		} else {
-			// Base64 decoding S3 accessKey and secretKey before create static credentials
-			// To be backward compatible, just updating base64 encoded values
-			accessKey := bc.AccessKey
-			secretKey := bc.SecretKey
-			if len(accessKey) > 0 {
-				v, err := base64.StdEncoding.DecodeString(accessKey)
-				if err == nil {
-					accessKey = string(v)
-				}
-			}
-			if len(secretKey) > 0 {
-				v, err := base64.StdEncoding.DecodeString(secretKey)
-				if err == nil {
-					secretKey = string(v)
-				}
-			}
-			cred = credentials.NewStatic(accessKey, secretKey, "", credentials.SignatureDefault)
+			cred = credentials.NewStatic(bc.AccessKey, bc.SecretKey, "", credentials.SignatureDefault)
 		}
 		client, err = minio.NewWithOptions(bc.Endpoint, &minio.Options{
 			Creds:        cred,
