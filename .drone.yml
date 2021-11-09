@@ -7,7 +7,7 @@ platform:
 
 steps:
   - name: build
-    image: rancher/dapper:v0.5.1
+    image: rancher/dapper:v0.5.7
     volumes:
       - name: docker
         path: /var/run/docker.sock
@@ -22,7 +22,7 @@ steps:
       - pull_request
       - tag
   - name: stage-binaries
-    image: rancher/dapper:v0.5.1
+    image: rancher/dapper:v0.5.7
     commands:
       - cp -r ./bin/* ./
     when:
@@ -64,7 +64,7 @@ platform:
 
 steps:
   - name: build
-    image: rancher/dapper:v0.5.1
+    image: rancher/dapper:v0.5.7
     volumes:
       - name: docker
         path: /var/run/docker.sock
@@ -79,7 +79,7 @@ steps:
       - pull_request
       - tag
   - name: stage-binaries
-    image: rancher/dapper:v0.5.1
+    image: rancher/dapper:v0.5.7
     commands:
       - cp -r ./bin/* ./
     when:
@@ -148,48 +148,6 @@ volumes:
       path: \\\\.\\pipe\\docker_engine
 ---
 kind: pipeline
-name: windows-2004
-
-platform:
-  os: windows
-  arch: amd64
-  version: 2004
-
-# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
-clone:
-  disable: true
-
-steps:
-  - name: clone
-    image: luthermonson/drone-git:windows-2004-amd64
-  - name: publish-rke-tools-windows-2004
-    image: luthermonson/drone-docker:2004
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      dockerfile: package/Dockerfile.windows
-      build_args:
-        - SERVERCORE_VERSION=2004
-      repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-windows-2004"
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      refs:
-        - refs/head/master
-        - refs/tags/*
-      event:
-        - tag
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
----
-kind: pipeline
 name: windows-20H2
 
 platform:
@@ -252,5 +210,4 @@ depends_on:
 - linux-amd64
 - linux-arm64
 - windows-1809
-- windows-2004
 - windows-20H2
