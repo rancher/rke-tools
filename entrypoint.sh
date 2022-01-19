@@ -12,6 +12,13 @@ if echo ${@} | grep -q "cloud-provider=azure"; then
   fi
 fi
 
+if [ "$1" = "kube-proxy" ]; then
+  if echo ${@} | grep -v "hostname-override"; then
+    hostname=$(curl "http://169.254.169.254/latest/meta-data/hostname")
+    set ${@} --hostname-override=$hostname
+  fi
+fi
+
 if [ "$1" = "kubelet" ]; then
     DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info 2>&1  | grep -i 'docker root dir' | cut -f2 -d:)
     DOCKER_DIRS=$(find -O1 $DOCKER_ROOT -maxdepth 1) # used to exclude mounts that are subdirectories of $DOCKER_ROOT to ensure we don't unmount mounted filesystems on sub directories
