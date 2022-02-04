@@ -1,4 +1,4 @@
-FROM nginx:1.21.0-alpine
+FROM nginx:1.21.6-alpine
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
 ARG ARCH=amd64
