@@ -113,6 +113,70 @@ volumes:
       path: /var/run/docker.sock
 ---
 kind: pipeline
+name: linux-s390x
+
+platform:
+  os: linux
+  arch: amd64
+
+# Hack needed for s390x: https://gist.github.com/colstrom/c2f359f72658aaabb44150ac20b16d7c#gistcomment-3858388
+node:
+  arch: s390x
+
+steps:
+  - name: build
+    image: rancher/dapper:v0.5.8
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    commands:
+      - dapper ci
+    when:
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - push
+      - pull_request
+      - tag
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.8
+    commands:
+      - cp -r ./bin/* ./
+    when:
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+  - name: publish-rke-tools-s390x
+    image: rancher/drone-images:docker-s390x
+    volumes:
+    - name: docker
+      path: /var/run/docker.sock
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      dockerfile: package/Dockerfile
+      build_args:
+        - ARCH=s390x
+      repo: rancher/rke-tools
+      tag: "${DRONE_TAG}-linux-s390x"
+      no_cache: true
+    when:
+      refs:
+      - refs/head/master
+      - refs/tags/*
+      event:
+      - tag
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+---
+kind: pipeline
 name: windows-1809
 
 platform:
@@ -209,5 +273,6 @@ steps:
 depends_on:
 - linux-amd64
 - linux-arm64
+- linux-s390x
 - windows-1809
 - windows-20H2

@@ -11,6 +11,11 @@ manifests:
       architecture: arm64
       os: linux
   -
+    image: rancher/rke-tools:{{build.tag}}-linux-s390x
+    platform:
+      architecture: s390x
+      os: linux
+  -
     image: rancher/rke-tools:{{build.tag}}-windows-1809
     platform:
       architecture: amd64
