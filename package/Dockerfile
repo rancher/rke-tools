@@ -23,7 +23,7 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && apk del curl
 
 RUN mkdir -p /opt/cni/bin
-RUN wget -q -O - https://github.com/containernetworking/cni/releases/download/v0.9.1/cni-${ARCH}-v0.9.1.tgz | tar xzf - -C /tmp
+RUN wget -q -O - https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-${ARCH}-v0.9.1.tgz | tar xzf - -C /tmp
 RUN wget -q -O /tmp/portmap https://github.com/rancher/plugins/releases/download/v1.9.1-rancher1/portmap-${ARCH}
 
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-${ARCH}.tar.gz
