@@ -293,7 +293,7 @@ if ($networkConfigObj)
 
             $winsArgs = $($flannelArgs -join ' ')
             Log-Info "Start flanneld with: $winsArgs"
-            wins.exe cli prc run --path "$prefixPath\opt\bin\flanneld.exe" --exposes ("UDP:{0}" -f $port) --args "$winsArgs" --envs "NODE_NAME=$nodeName"
+            wins.exe cli prc run --path "$prefixPath\opt\bin\flanneld.exe" --exposes ("UDP:{0}" -f $port) --envs "NODE_NAME=$nodeName" --args "$winsArgs"
         }
     }
 
