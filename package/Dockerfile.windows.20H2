@@ -85,7 +85,7 @@ RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V
     \
     Write-Host 'Complete.'
 # download wins
-RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.1.1-patch1/wins.exe'; \
+RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.2.1/wins.exe'; \
     \
     Write-Host ('Downloading wins from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
