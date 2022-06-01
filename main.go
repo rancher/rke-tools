@@ -30,7 +30,7 @@ import (
 
 const (
 	backupBaseDir         = "/backup"
-	backupRetries         = 4
+	defaultBackupRetries  = 4
 	clusterStateExtension = "rkestate"
 	compressedExtension   = "zip"
 	contentType           = "application/zip"
@@ -79,7 +79,7 @@ var commonFlags = []cli.Flag{
 	},
 	cli.BoolFlag{
 		Name:   "s3-backup",
-		Usage:  "Backup etcd sanpshot to your s3 server, set true or false",
+		Usage:  "Backup etcd snapshot to your s3 server, set true or false",
 		EnvVar: "S3_BACKUP",
 	},
 	cli.StringFlag{
@@ -328,6 +328,20 @@ func SaveBackupAction(c *cli.Context) error {
 		Folder:     c.String("s3-folder"),
 	}
 
+	backupRetries := defaultBackupRetries
+	if c.IsSet("backup-retries") {
+		if backupRetries = c.Int("backup-retries"); backupRetries < 0 {
+			backupRetries = 0
+		}
+	}
+
+	s3Retries := s3ServerRetries
+	if c.IsSet("s3-retries") {
+		if s3Retries = c.Int("s3-retries"); s3Retries < 0 {
+			s3Retries = 0
+		}
+	}
+
 	var client = &minio.Client{}
 	var tr = http.DefaultTransport
 	var err error
@@ -360,7 +374,7 @@ func SaveBackupAction(c *cli.Context) error {
 			"name": backupName,
 		}).Info("Initializing Onetime Backup")
 
-		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err != nil {
+		if err := CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, backupRetries, s3Retries, client, bc); err != nil {
 			return err
 		}
 		prefix := getNamePrefix(backupName)
@@ -392,7 +406,7 @@ func SaveBackupAction(c *cli.Context) error {
 				}).Warn("Error while trying to retrieve cluster state from cluster")
 
 			}
-			if err = CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, client, bc); err == nil {
+			if err = CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, etcdEndpoints, backupRetries, s3Retries, client, bc); err == nil {
 				DeleteBackups(backupTime, retentionPeriod)
 				if s3Backup {
 					DeleteS3Backups(backupTime, retentionPeriod, client, bc)
@@ -402,7 +416,7 @@ func SaveBackupAction(c *cli.Context) error {
 	}
 }
 
-func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints string, svc *minio.Client, server *backupConfig) error {
+func CreateBackup(backupName, etcdCACert, etcdCert, etcdKey, endpoints string, backupRetries, s3Retries int, svc *minio.Client, server *backupConfig) error {
 	backupFile := fmt.Sprintf("%s/%s", backupBaseDir, backupName)
 	stateFile := fmt.Sprintf("%s/%s.%s", k8sBaseDir, backupName, clusterStateExtension)
 	var err error
@@ -468,7 +482,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			continue
 		}
 		compressedFile := filepath.Base(compressedFilePath)
-		// Remove the original file after succesfully compressing it
+		// Remove the original file after successfully compressing it
 		err = os.Remove(backupFile)
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -479,7 +493,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			continue
 
 		}
-		// Remove the state file after succesfully compressing it
+		// Remove the state file after successfully compressing it
 		if _, err = os.Stat(stateFile); err == nil {
 			err = os.Remove(stateFile)
 			if err != nil {
@@ -510,7 +524,7 @@ func CreateBackup(backupName string, etcdCACert, etcdCert, etcdKey, endpoints st
 			if len(server.Folder) != 0 {
 				compressedFile = fmt.Sprintf("%s/%s", server.Folder, compressedFile)
 			}
-			err = uploadBackupFile(svc, server.BucketName, compressedFile, compressedFilePath)
+			err = uploadBackupFile(svc, server.BucketName, compressedFile, compressedFilePath, s3Retries)
 			if err == nil {
 				return nil
 			}
@@ -814,22 +828,20 @@ func getBucketLookupType(endpoint string) minio.BucketLookupType {
 	return minio.BucketLookupAuto
 }
 
-func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string) error {
+func uploadBackupFile(svc *minio.Client, bucketName, fileName, filePath string, s3Retries int) error {
+	var n int64
+	var err error
 	// Upload the zip file with FPutObject
 	log.Infof("invoking uploading backup file [%s] to s3", fileName)
-	for retries := 0; retries <= s3ServerRetries; retries++ {
-		n, err := svc.FPutObject(bucketName, fileName, filePath, minio.PutObjectOptions{ContentType: contentType})
-		if err != nil {
-			log.Infof("failed to upload etcd snapshot file: %v, retried %d times", err, retries)
-			if retries >= s3ServerRetries {
-				return fmt.Errorf("failed to upload etcd snapshot file: %v", err)
-			}
-			continue
+	for i := 0; i <= s3Retries; i++ {
+		n, err = svc.FPutObject(bucketName, fileName, filePath, minio.PutObjectOptions{ContentType: contentType})
+		if err == nil {
+			log.Infof("Successfully uploaded [%s] of size [%d]", fileName, n)
+			return nil
 		}
-		log.Infof("Successfully uploaded [%s] of size [%d]", fileName, n)
-		break
+		log.Infof("failed to upload etcd snapshot file: %v, retried %d times", err, i)
 	}
-	return nil
+	return fmt.Errorf("failed to upload etcd snapshot file: %v", err)
 }
 
 func DownloadBackupAction(c *cli.Context) error {
@@ -1080,7 +1092,7 @@ func setupTLSConfig(certs map[string]string, isServer bool) (*tls.Config, error)
 func IsRecurringSnapshot(name string) bool {
 	// name is fmt.Sprintf("%s-%s%s-", cluster.Name, typeFlag, providerFlag)
 	// typeFlag = "r": recurring
-	// typeFlag = "m": manaul
+	// typeFlag = "m": manual
 	//
 	// providerFlag = "l" local
 	// providerFlag = "s" s3
@@ -1129,7 +1141,7 @@ func downloadFromS3WithPrefix(client *minio.Client, prefix, bucket string) (stri
 	if len(filename) == 0 {
 		return "", fmt.Errorf("failed to download s3 backup: no backups found")
 	}
-	// if folder is included, strip it so it doesnt end up in a folder on the host itself
+	// if folder is included, strip it so it doesn't end up in a folder on the host itself
 	targetFilename := path.Base(filename)
 	targetFileLocation := fmt.Sprintf("%s/%s", backupBaseDir, targetFilename)
 	var object *minio.Object
@@ -1333,7 +1345,7 @@ func retrieveAndWriteStatefile(backupName string) error {
 
 	var out bytes.Buffer
 	var err error
-	for retries := 0; retries <= backupRetries; retries++ {
+	for retries := 0; retries <= defaultBackupRetries; retries++ {
 		log.WithFields(log.Fields{
 			"attempt": retries + 1,
 			"name":    backupName,
@@ -1355,7 +1367,7 @@ func retrieveAndWriteStatefile(backupName string) error {
 				"name":    backupName,
 				"err":     fmt.Sprintf("%s: %s", err, stderr.String()),
 			}).Warn("Failed to retrieve configmap full-cluster-state using kubectl")
-			if retries >= backupRetries {
+			if retries >= defaultBackupRetries {
 				return fmt.Errorf("Failed to retrieve configmap full-cluster-state using kubectl: %v", fmt.Sprintf("%s: %s", err, stderr.String()))
 			}
 			continue
