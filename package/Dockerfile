@@ -5,7 +5,7 @@ ARG ARCH=amd64
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.12.3.tgz \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.12.3/docker-v1.12.3_arm64.tgz \
     DOCKER_URL=DOCKER_URL_${ARCH}
-ENV CRIDOCKERD_URL=https://github.com/Mirantis/cri-dockerd/releases/download/v0.2.1/cri-dockerd-0.2.1.${ARCH}.tgz
+ENV CRIDOCKERD_URL=https://github.com/Mirantis/cri-dockerd/releases/download/v0.2.2/cri-dockerd-0.2.2.${ARCH}.tgz
 RUN apk -U upgrade \
     && apk -U --no-cache add bash \
     && rm -f /bin/sh \
