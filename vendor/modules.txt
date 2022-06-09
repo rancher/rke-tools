@@ -1,56 +1,77 @@
-# github.com/json-iterator/go v1.1.9
-github.com/json-iterator/go
-# github.com/klauspost/cpuid v1.2.3
-github.com/klauspost/cpuid
-# github.com/konsorten/go-windows-terminal-sequences v1.0.1
-github.com/konsorten/go-windows-terminal-sequences
-# github.com/minio/md5-simd v1.1.0
-github.com/minio/md5-simd
-# github.com/minio/minio-go/v6 v6.0.57
+# github.com/cpuguy83/go-md2man/v2 v2.0.2
 ## explicit
-github.com/minio/minio-go/v6
-github.com/minio/minio-go/v6/pkg/credentials
-github.com/minio/minio-go/v6/pkg/encrypt
-github.com/minio/minio-go/v6/pkg/s3utils
-github.com/minio/minio-go/v6/pkg/set
-github.com/minio/minio-go/v6/pkg/signer
-github.com/minio/minio-go/v6/pkg/tags
-# github.com/minio/sha256-simd v0.1.1
+github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/dustin/go-humanize v1.0.0
+github.com/dustin/go-humanize
+# github.com/google/uuid v1.3.0
+## explicit
+github.com/google/uuid
+# github.com/json-iterator/go v1.1.12
+github.com/json-iterator/go
+# github.com/klauspost/compress v1.15.6
+## explicit
+github.com/klauspost/compress/s2
+# github.com/klauspost/cpuid/v2 v2.0.12
+## explicit
+github.com/klauspost/cpuid/v2
+# github.com/minio/md5-simd v1.1.2
+## explicit
+github.com/minio/md5-simd
+# github.com/minio/minio-go/v7 v7.0.27
+## explicit
+github.com/minio/minio-go/v7
+github.com/minio/minio-go/v7/pkg/credentials
+github.com/minio/minio-go/v7/pkg/encrypt
+github.com/minio/minio-go/v7/pkg/lifecycle
+github.com/minio/minio-go/v7/pkg/notification
+github.com/minio/minio-go/v7/pkg/replication
+github.com/minio/minio-go/v7/pkg/s3utils
+github.com/minio/minio-go/v7/pkg/set
+github.com/minio/minio-go/v7/pkg/signer
+github.com/minio/minio-go/v7/pkg/sse
+github.com/minio/minio-go/v7/pkg/tags
+# github.com/minio/sha256-simd v1.0.0
+## explicit
 github.com/minio/sha256-simd
 # github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
-# github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 github.com/modern-go/concurrent
-# github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
+# github.com/modern-go/reflect2 v1.0.2
 github.com/modern-go/reflect2
-# github.com/sirupsen/logrus v1.5.0
+# github.com/rs/xid v1.4.0
+## explicit
+github.com/rs/xid
+# github.com/russross/blackfriday/v2 v2.1.0
+github.com/russross/blackfriday/v2
+# github.com/sirupsen/logrus v1.8.1
 ## explicit
 github.com/sirupsen/logrus
-# github.com/smartystreets/goconvey v1.6.4
-## explicit
 # github.com/stretchr/testify v1.6.1
 ## explicit
-# github.com/urfave/cli v1.18.0
+# github.com/urfave/cli v1.22.9
 ## explicit
 github.com/urfave/cli
-# golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+# golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
-# golang.org/x/net v0.0.0-20210525063256-abc453219eb5
+# golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 ## explicit
 golang.org/x/net/http/httpguts
 golang.org/x/net/idna
 golang.org/x/net/publicsuffix
-# golang.org/x/sys v0.0.0-20210603125802-9665404d3644
+# golang.org/x/sys v0.0.0-20220608164250-635b8c9b7f68
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
-# golang.org/x/text v0.3.6
+golang.org/x/sys/windows
+# golang.org/x/text v0.3.7
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# gopkg.in/ini.v1 v1.42.0
+# gopkg.in/ini.v1 v1.66.6
+## explicit
 gopkg.in/ini.v1
