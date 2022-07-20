@@ -113,42 +113,6 @@ volumes:
       path: /var/run/docker.sock
 ---
 kind: pipeline
-name: windows-1809
-
-platform:
-  os: windows
-  arch: amd64
-  version: 1809
-
-steps:
-  - name: publish-rke-tools-windows-1809
-    image: plugins/docker
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      dockerfile: package/Dockerfile.windows
-      build_args:
-        - SERVERCORE_VERSION=1809
-      repo: rancher/rke-tools
-      tag: "${DRONE_TAG}-windows-1809"
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      refs:
-      - refs/head/master
-      - refs/tags/*
-      event:
-      - tag
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
----
-kind: pipeline
 name: manifest
 
 steps:
@@ -169,7 +133,6 @@ steps:
 depends_on:
 - linux-amd64
 - linux-arm64
-- windows-1809
 ---
 kind: pipeline
 name: fossa
