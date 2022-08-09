@@ -79,6 +79,13 @@ if [ "$1" = "kubelet" ]; then
 
     # separate flow for cri-dockerd to minimize change to the existing way we run kubelet
     if [ "${RKE_KUBELET_CRIDOCKERD}" == "true" ]; then
+
+        # Mount kubelet docker config to /.docker/config.json
+        if [ ! -z "${RKE_KUBELET_DOCKER_CONFIG}" ]
+        then
+          mkdir -p /.docker && touch /.docker/config.json
+          mount --bind ${RKE_KUBELET_DOCKER_FILE} /.docker/config.json
+        fi
         
         # Get the value of pause image to start cri-dockerd
         RKE_KUBELET_PAUSEIMAGE=$(echo "$@" | grep -Eo "\-\-pod-infra-container-image+.*" | awk '{print $1}')
