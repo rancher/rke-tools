@@ -91,7 +91,7 @@ if [ "$1" = "kubelet" ]; then
         RKE_KUBELET_PAUSEIMAGE=$(echo "$@" | grep -Eo "\-\-pod-infra-container-image+.*" | awk '{print $1}')
         CONTAINER_RUNTIME_ENDPOINT=$(echo "$@" | grep -Eo "\-\-container-runtime-endpoint+.*" | awk '{print $1}' | cut -d "=" -f2)
         if [ "$CONTAINER_RUNTIME_ENDPOINT" == "/var/run/dockershim.sock" ]; then
-          # cri-dockerd v0.2.4 requires unix socket or tcp endpoint, update old endpoint passed by rke
+          # cri-dockerd v0.3.1 requires unix socket or tcp endpoint, update old endpoint passed by rke
           CONTAINER_RUNTIME_ENDPOINT="unix://$CONTAINER_RUNTIME_ENDPOINT"
         fi
         /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" ${RKE_KUBELET_PAUSEIMAGE} --container-runtime-endpoint=$CONTAINER_RUNTIME_ENDPOINT &
