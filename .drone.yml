@@ -7,7 +7,7 @@ platform:
 
 steps:
   - name: build
-    image: rancher/dapper:v0.5.7
+    image: rancher/dapper:v0.6.0
     volumes:
       - name: docker
         path: /var/run/docker.sock
@@ -22,7 +22,7 @@ steps:
       - pull_request
       - tag
   - name: stage-binaries
-    image: rancher/dapper:v0.5.7
+    image: rancher/dapper:v0.6.0
     commands:
       - cp -r ./bin/* ./
     when:
@@ -64,7 +64,7 @@ platform:
 
 steps:
   - name: build
-    image: rancher/dapper:v0.5.7
+    image: rancher/dapper:v0.6.0
     volumes:
       - name: docker
         path: /var/run/docker.sock
@@ -79,7 +79,7 @@ steps:
       - pull_request
       - tag
   - name: stage-binaries
-    image: rancher/dapper:v0.5.7
+    image: rancher/dapper:v0.6.0
     commands:
       - cp -r ./bin/* ./
     when:

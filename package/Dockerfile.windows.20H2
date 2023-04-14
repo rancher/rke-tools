@@ -67,7 +67,7 @@ RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.
     \
     Write-Host 'Complete.'
 # download flanneld
-RUN $URL = 'https://github.com/flannel-io/flannel/releases/download/v0.15.0/flanneld.exe'; \
+RUN $URL = 'https://github.com/flannel-io/flannel/releases/download/v0.21.4/flanneld.exe'; \
 	New-Item -Path c:\ -Name "flanneld" -ItemType "directory"; \
     Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -85,7 +85,7 @@ RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V
     \
     Write-Host 'Complete.'
 # download wins
-RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.2.1/wins.exe'; \
+RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.11/wins.exe'; \
     \
     Write-Host ('Downloading wins from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
