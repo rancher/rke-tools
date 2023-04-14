@@ -27,9 +27,7 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
 
 RUN mkdir -p /opt/cni/bin
 ENV UPSTREAM_PLUGIN_VERSION=v1.2.0
-ENV RANCHER_PLUGIN_VERSION=v1.9.1-rancher1
 RUN wget -q -O - https://github.com/containernetworking/plugins/releases/download/${UPSTREAM_PLUGIN_VERSION}/cni-plugins-linux-${ARCH}-${UPSTREAM_PLUGIN_VERSION}.tgz | tar xzf - -C /tmp
-RUN wget -q -O /tmp/portmap https://github.com/rancher/plugins/releases/download/${RANCHER_PLUGIN_VERSION}/portmap-${ARCH}
 
 ENV ETCD_VERSION=v3.4.15
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${ARCH}.tar.gz
