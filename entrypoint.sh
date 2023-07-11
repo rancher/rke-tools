@@ -105,6 +105,7 @@ if [ "$1" = "kubelet" ]; then
 
         # waiting for either cri-dockerd or kubelet to crash and exit so it can be restarted
         wait -n
+        exit $?
     else
         # start kubelet
         exec "$@" --cgroup-driver=$CGROUPDRIVER $RESOLVCONF
