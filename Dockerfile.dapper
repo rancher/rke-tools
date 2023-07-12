@@ -1,29 +1,15 @@
-FROM ubuntu:22.04
-# FROM arm=armhf/ubuntu:20.04 arm64=arm64v8/ubuntu:20.04
-
-ENV DOCKER_VERSION=20.10.25
-ENV GO_VERSION=1.20.3
+FROM registry.suse.com/bci/golang:1.19
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 
-RUN apt-get update && \
-    apt-get install -y gcc ca-certificates git wget curl vim less file && \
-    rm -f /bin/sh && ln -s /bin/bash /bin/sh
+RUN zypper -n install gcc vim less file docker git wget curl go
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
 ENV GOLANGCI_LINT=v1.53.3
-RUN wget -O - "https://dl.google.com/go/go${GO_VERSION}.linux-${!GOLANG_ARCH}.tar.gz" | tar -xzf - -C /usr/local && \
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s ${GOLANGCI_LINT};
-
-ENV DOCKER_URL_amd64=https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
-    DOCKER_URL_arm=https://download.docker.com/linux/static/stable/armhf/docker-${DOCKER_VERSION}.tgz \
-    DOCKER_URL_arm64=https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz \
-    DOCKER_URL="DOCKER_URL_${ARCH}"
-
-RUN wget -O - "${!DOCKER_URL}" | tar xvfz - -C /usr/bin --strip-components=1 docker/docker && chmod +x /usr/bin/docker
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s ${GOLANGCI_LINT};
 
 ENV DAPPER_ENV REPO TAG DRONE_TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rke-tools/
