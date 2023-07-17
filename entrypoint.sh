@@ -2,6 +2,11 @@
 
 set -x
 
+# Evaluate the iptables mode every time the container starts (fixes OS upgrades changing mode)
+if [ "$1" = "kubelet" ] || [ "$1" = "kube-proxy" ]; then
+  update-alternatives --set iptables /usr/sbin/iptables-wrapper
+fi
+
 # generate Azure cloud provider config
 if echo ${@} | grep -q "cloud-provider=azure"; then
   if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
