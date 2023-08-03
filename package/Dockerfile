@@ -1,7 +1,7 @@
 FROM nginx:1.24.0-alpine
 
 ENV DOCKER_VERSION=20.10.24
-ENV PLUGINS_VERSION=v1.2.0
+ENV CNI_PLUGINS_VERSION=v1.2.0
 ENV ETCD_VERSION=v3.4.25
 ENV CRIDOCKERD_VERSION=0.3.1
 ENV RANCHER_CONFD_VERSION=v0.16.4
@@ -29,7 +29,7 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && apk del curl
 
 RUN mkdir -p /opt/cni/bin
-RUN wget -q -O - https://github.com/containernetworking/plugins/releases/download/${PLUGINS_VERSION}/cni-plugins-linux-${ARCH}-${PLUGINS_VERSION}.tgz | tar xzf - -C /tmp
+RUN wget -q -O - https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-${ARCH}-${CNI_PLUGINS_VERSION}.tgz | tar xzf - -C /tmp
 
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${ARCH}.tar.gz
 
