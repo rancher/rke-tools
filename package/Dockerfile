@@ -1,4 +1,4 @@
-FROM nginx:1.24.0-alpine
+FROM nginx:1.24.0-alpine as base
 
 ENV DOCKER_VERSION=20.10.24
 ENV CNI_PLUGINS_VERSION=v1.2.0
@@ -49,3 +49,39 @@ COPY rke-etcd-backup /opt/rke-tools
 
 VOLUME /opt/rke-tools
 CMD ["/bin/bash"]
+
+# Temporary image mostly to verify all binaries exist and are
+# valid for the target architecture.
+FROM tonistiigi/xx:1.2.1 AS xx
+FROM base as test
+COPY --from=xx / /
+
+ARG TARGETOS=linux
+ARG TARGETARCH=${ARCH}
+
+RUN xx-verify --static /tmp/bandwidth \
+    && xx-verify --static /tmp/bridge \
+    && xx-verify --static /tmp/dhcp \
+    && xx-verify --static /tmp/firewall \
+    && xx-verify --static /tmp/flannel \
+    && xx-verify --static /tmp/host-device \
+    && xx-verify --static /tmp/host-local \
+    && xx-verify --static /tmp/ipvlan \
+    && xx-verify --static /tmp/loopback \
+    && xx-verify --static /tmp/macvlan \
+    && xx-verify --static /tmp/portmap \
+    && xx-verify --static /tmp/ptp \
+    && xx-verify --static /tmp/sbr \
+    && xx-verify --static /tmp/static \
+    && xx-verify --static /tmp/tuning \
+    && xx-verify --static /tmp/vlan \
+    && xx-verify --static /tmp/vrf
+
+RUN xx-verify --static /opt/rke-tools/bin/cri-dockerd \
+    && xx-verify --static /opt/rke-tools/bin/docker \
+    && xx-verify --static /opt/rke-tools/rke-etcd-backup
+
+RUN xx-verify --static /usr/bin/confd \
+    && xx-verify --static /usr/local/bin/kubectl
+
+FROM base as final
