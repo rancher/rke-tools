@@ -7,7 +7,7 @@ if [ "$1" = "kubelet" ] || [ "$1" = "kube-proxy" ]; then
   update-alternatives --set iptables /usr/sbin/iptables-wrapper
 fi
 
-# generate Azure cloud provider config
+# generate Azure cloud provider config if configured
 if echo ${@} | grep -q "cloud-provider=azure"; then
   if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
     source /opt/rke-tools/cloud-provider.sh
@@ -17,6 +17,9 @@ if echo ${@} | grep -q "cloud-provider=azure"; then
   fi
 fi
 
+# In case of AWS cloud provider being configured, RKE will not set `hostname-override` flag because it needs to match the node/instance name in AWS.
+# This will query EC2 metadata and use the value for setting `hostname-override` to match the node/instance name.
+# RKE pull request: https://github.com/rancher/rke/pull/2803
 if [ "$1" = "kube-proxy" ]; then
   if echo ${@} | grep -v "hostname-override"; then
     hostname=$(curl "http://169.254.169.254/latest/meta-data/hostname")
@@ -24,6 +27,7 @@ if [ "$1" = "kube-proxy" ]; then
   fi
 fi
 
+# Prepare kubelet for running inside container
 if [ "$1" = "kubelet" ]; then
     DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info 2>&1  | grep -i 'docker root dir' | cut -f2 -d:)
     DOCKER_DIRS=$(find -O1 $DOCKER_ROOT -maxdepth 1) # used to exclude mounts that are subdirectories of $DOCKER_ROOT to ensure we don't unmount mounted filesystems on sub directories
@@ -56,6 +60,7 @@ if [ "$1" = "kubelet" ]; then
     # https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#network-plugin-requirements
     sysctl -w net.bridge.bridge-nf-call-iptables=1 || true
 
+    # Mount host os-release so kubelet can report the correct OS
     if [ -f /host/usr/lib/os-release ]; then
         ln -sf /host/usr/lib/os-release /usr/lib/os-release
     elif [ -f /host/etc/os-release ]; then
