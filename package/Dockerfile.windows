@@ -1,6 +1,14 @@
 ARG SERVERCORE_VERSION
 
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} as builder
+
+ENV NGINX_VERSION=1.24.0
+ENV CONFD_VERSION=0.16.0
+ENV CNI_PLUGINS_VERSION=1.2.0
+ENV FLANNEL_VERSION=0.21.4
+ENV STORAGE_PLUGIN_VERSION=0.0.3
+ENV RANCHER_WINS_VERSION=0.4.11
+
 ARG ARCH=amd64
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 RUN if (-not (Get-Command Expand-7Zip -ErrorAction Ignore)) { \
@@ -12,7 +20,7 @@ RUN if (-not (Get-Command Expand-7Zip -ErrorAction Ignore)) { \
        } \
     }
 # download confd
-RUN $URL = 'https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-windows-amd64.exe'; \
+RUN $URL = "https://github.com/kelseyhightower/confd/releases/download/v${CONFD_VERSION}/confd-${CONFD_VERSION}-windows-amd64.exe"; \
     \
     Write-Host ('Downloading confd from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -20,7 +28,7 @@ RUN $URL = 'https://github.com/kelseyhightower/confd/releases/download/v0.16.0/c
     \
     Write-Host 'Complete.'
 # download nginx
-RUN $URL = 'http://nginx.org/download/nginx-1.19.9.zip'; \
+RUN $URL = "http://nginx.org/download/nginx-${NGINX_VERSION}.zip"; \
     \
     Write-Host ('Downloading nginx from {0} ...'  -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -31,7 +39,7 @@ RUN $URL = 'http://nginx.org/download/nginx-1.19.9.zip'; \
     \
     Write-Host 'Complete.'
 # download cni plugins
-RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-windows-amd64-v0.9.1.tgz'; \
+RUN $URL = "https://github.com/containernetworking/plugins/releases/download/v${CNI_PLUGINS_VERSION}/cni-plugins-windows-amd64-v${CNI_PLUGINS_VERSION}.tgz"; \
     \
     function DeGZip-File ($inFile, $outFile) { \
         $input = New-Object System.IO.FileStream $inFile, ([IO.FileMode]::Open), ([IO.FileAccess]::Read), ([IO.FileShare]::Read); \
@@ -67,14 +75,14 @@ RUN $URL = 'https://github.com/containernetworking/plugins/releases/download/v0.
     \
     Write-Host 'Complete.'
 # download flanneld
-RUN $URL = 'https://github.com/flannel-io/flannel/releases/download/v0.15.0/flanneld.exe'; \
+RUN $URL = "https://github.com/flannel-io/flannel/releases/download/v${FLANNEL_VERSION}/flanneld.exe"; \
 	New-Item -Path c:\ -Name "flanneld" -ItemType "directory"; \
     Write-Host ('Downloading flanneld from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
     Invoke-WebRequest -UseBasicParsing -OutFile c:\flanneld\flanneld.exe -Uri $URL; \
     Write-Host 'Complete.'
 # download flexvolume plugins
-RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V0.0.3/flexvolume-windows.zip'; \
+RUN $URL = "https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V${STORAGE_PLUGIN_VERSION}/flexvolume-windows.zip"; \
     \
     Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -85,7 +93,7 @@ RUN $URL = 'https://github.com/microsoft/K8s-Storage-Plugins/releases/download/V
     \
     Write-Host 'Complete.'
 # download wins
-RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.2.1/wins.exe'; \
+RUN $URL = "https://github.com/rancher/wins/releases/download/v${RANCHER_WINS_VERSION}/wins.exe"; \
     \
     Write-Host ('Downloading wins from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
@@ -106,7 +114,7 @@ FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
 USER ContainerAdministrator
 COPY --from=builder /Windows/System32/netapi32.dll /Windows/System32/
 COPY --from=builder /wins.exe /confd.exe /Windows/
-COPY --from=builder /nginx-1.19.9 /etc/nginx
+COPY --from=builder /nginx-${NGINX_VERSION} /etc/nginx
 COPY --from=builder /containernetworking/bin/host-local.exe /containernetworking/bin/flannel.exe /containernetworking/bin/win-overlay.exe /containernetworking/bin/win-bridge.exe /opt/cni/bin/
 COPY --from=builder /flanneld/flanneld.exe /opt/bin/
 COPY --from=builder /flexvolume /share/kubelet-volumeplugins

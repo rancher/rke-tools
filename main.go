@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -555,7 +554,7 @@ func CreateS3Backup(backupName, compressedFilePath string, bc *backupConfig) err
 }
 
 func DeleteBackups(backupTime time.Time, retentionPeriod time.Duration) {
-	files, err := ioutil.ReadDir(backupBaseDir)
+	files, err := os.ReadDir(backupBaseDir)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"dir":   backupBaseDir,
@@ -777,7 +776,7 @@ func setS3Service(bc *backupConfig, useSSL bool) (*minio.Client, error) {
 
 	var err error
 	var client = &minio.Client{}
-	var cred = &credentials.Credentials{}
+	var cred *credentials.Credentials
 	var tr = http.DefaultTransport
 	if bc.EndpointCA != "" {
 		tr, err = setTransportCA(tr, bc.EndpointCA)
@@ -1007,7 +1006,7 @@ func DownloadLocalBackup(c *cli.Context) error {
 }
 
 func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
-	files, err := ioutil.ReadDir(backupBaseDir)
+	files, err := os.ReadDir(backupBaseDir)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"dir":   backupBaseDir,
@@ -1017,7 +1016,11 @@ func DeleteNamedBackups(retentionPeriod time.Duration, prefix string) error {
 	}
 	cutoffTime := time.Now().Add(retentionPeriod * -1)
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), prefix) && file.ModTime().Before(cutoffTime) && IsRecurringSnapshot(file.Name()) {
+		fi, err := file.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get file info: %w", err)
+		}
+		if strings.HasPrefix(file.Name(), prefix) && fi.ModTime().Before(cutoffTime) && IsRecurringSnapshot(file.Name()) {
 			if err = deleteBackup(file.Name()); err != nil {
 				return err
 			}
@@ -1086,7 +1089,7 @@ func getCertsFromCli(c *cli.Context) (map[string]string, error) {
 }
 
 func setupTLSConfig(certs map[string]string, isServer bool) (*tls.Config, error) {
-	caCertPem, err := ioutil.ReadFile(certs["cacert"])
+	caCertPem, err := os.ReadFile(certs["cacert"])
 	if err != nil {
 		return nil, err
 	}
@@ -1268,7 +1271,7 @@ func readS3EndpointCA(endpointCA string) ([]byte, error) {
 	if err == nil {
 		log.Debug("reading s3-endpoint-ca as a base64 string")
 	} else {
-		ca, err = ioutil.ReadFile(endpointCA)
+		ca, err = os.ReadFile(endpointCA)
 		log.Debugf("reading s3-endpoint-ca from [%v]", endpointCA)
 	}
 	return ca, err
@@ -1280,10 +1283,7 @@ func isValidCertificate(c []byte) bool {
 		return false
 	}
 	_, err := x509.ParseCertificates(p.Bytes)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func setTransportCA(tr http.RoundTripper, endpointCA string) (http.RoundTripper, error) {
