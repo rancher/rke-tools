@@ -18,6 +18,7 @@ set_azure_config() {
   local az_subnet_name=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .subnetName)
   local az_vnet_name=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .vnetName)
   local az_vm_type=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .vmType)
+  local az_managed_identity_extension=$(cat "$AZURE_CLOUD_CONFIG_PATH" | jq -r .useManagedIdentityExtension)
 
   local az_vm_resources_group=$(curl  -s -H Metadata:true "${AZURE_META_URL}/resourceGroupName?api-version=${AZURE_META_API_VERSION}&format=text")
   local az_vm_name=$(curl -s -H Metadata:true "${AZURE_META_URL}/name?api-version=${AZURE_META_API_VERSION}&format=text")
@@ -32,8 +33,12 @@ set_azure_config() {
   az cloud set --name ${azure_cloud}
 
   # login to Azure
-  az login --service-principal -u ${azure_client_id} -p ${azure_client_secret} --tenant ${azure_tenant_id} 2>&1 > /dev/null
-
+  if [ "${az_managed_identity_extension}" = "true" ] && [ "${azure_client_secret}" = "" ]; then
+    echo "using MSI for az login"
+    az login --identity 2>&1 > /dev/null
+  else
+    az login --service-principal -u ${azure_client_id} -p ${azure_client_secret} --tenant ${azure_tenant_id} 2>&1 > /dev/null
+  fi
   # set subscription to be the current active subscription
   az account set --subscription ${az_subscription_id}
 

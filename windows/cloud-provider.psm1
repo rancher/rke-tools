@@ -31,6 +31,7 @@ function Complete-AzureCloudConfig
         $azureClientId = $azCloudConfig.aadClientId
         $azureClientSecret = $azCloudConfig.aadClientSecret
         $azureTenantId = $azCloudConfig.tenantId
+        $useManagedIdentityExtension = $azCloudConfig.useManagedIdentityExtension
 
         # verification
         if (-not $azureClientId) {
@@ -68,7 +69,11 @@ function Complete-AzureCloudConfig
         # NOTE: the escaping syntax around the secret is to ensure the azure-cli doesn't interpret the contents of the secret as a command.
         # See this issue for more information:
         # https://github.com/Azure/azure-cli/issues/8070
-        $errMsg = az login --service-principal -u $azureClientId -p "`"$azureClientSecret`"" --tenant $azureTenantId
+        $az_login_args='--service-principal -u $azureClientId -p "`"$azureClientSecret`"" --tenant $azureTenantId'
+        if (($useManagedIdentityExtension -eq "true") -and -not	 $azureClientSecret) {
+          $az_login_args='--identity'
+        }
+        $errMsg = az login $az_login_args
         if (-not $?) {
             Log-Fatal "Failed to login '$azureCloud' cloud: $errMsg"
         }
