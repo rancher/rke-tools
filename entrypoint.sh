@@ -108,7 +108,11 @@ if [ "$1" = "kubelet" ]; then
           # cri-dockerd v0.3.1 requires unix socket or tcp endpoint, update old endpoint passed by rke
           CONTAINER_RUNTIME_ENDPOINT="unix://$CONTAINER_RUNTIME_ENDPOINT"
         fi
-        /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" ${RKE_KUBELET_PAUSEIMAGE} --container-runtime-endpoint=$CONTAINER_RUNTIME_ENDPOINT &
+        EXTRA_FLAGS=""
+        if [ "${RKE_KUBELET_CRIDOCKERD_DUALSTACK}" == "true" ]; then
+          EXTRA_FLAGS="--ipv6-dual-stack"
+        fi
+        /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" ${RKE_KUBELET_PAUSEIMAGE} --container-runtime-endpoint=$CONTAINER_RUNTIME_ENDPOINT ${EXTRA_FLAGS} &
 
         # wait for cri-dockerd to start as kubelet depends on it
         echo "Sleeping 10 waiting for cri-dockerd to start"
