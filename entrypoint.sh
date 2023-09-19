@@ -29,7 +29,9 @@ fi
 
 # Prepare kubelet for running inside container
 if [ "$1" = "kubelet" ]; then
-    DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info 2>&1  | grep -i 'docker root dir' | cut -f2 -d:)
+    CGROUPDRIVER=$(/opt/rke-tools/bin/docker info -f '{{.Info.CgroupDriver}}')
+    CGROUPVERSION=$(/opt/rke-tools/bin/docker info -f '{{.Info.CgroupVersion}}')
+    DOCKER_ROOT=$(DOCKER_API_VERSION=1.24 /opt/rke-tools/bin/docker info -f '{{.Info.DockerRootDir}}')
     DOCKER_DIRS=$(find -O1 $DOCKER_ROOT -maxdepth 1) # used to exclude mounts that are subdirectories of $DOCKER_ROOT to ensure we don't unmount mounted filesystems on sub directories
     for i in $DOCKER_ROOT /var/lib/docker /run /var/run; do
         for m in $(tac /proc/mounts | awk '{print $2}' | grep ^${i}/); do
@@ -40,16 +42,20 @@ if [ "$1" = "kubelet" ]; then
     done
     mount --rbind /host/dev /dev
     mount -o rw,remount /sys/fs/cgroup 2>/dev/null || true
-    for i in /sys/fs/cgroup/*; do
-        if [ -d $i ]; then
-             mkdir -p $i/kubepods
-        fi
-    done
 
-    mkdir -p /sys/fs/cgroup/cpuacct,cpu/
-    mount --bind /sys/fs/cgroup/cpu,cpuacct/ /sys/fs/cgroup/cpuacct,cpu/
-    mkdir -p /sys/fs/cgroup/net_prio,net_cls/
-    mount --bind /sys/fs/cgroup/net_cls,net_prio/ /sys/fs/cgroup/net_prio,net_cls/
+    # Only applicable to cgroup v1
+    if [ "${CGROUPVERSION}" -eq 1 ]; then
+      for i in /sys/fs/cgroup/*; do
+        if [ -d $i ]; then
+          mkdir -p $i/kubepods
+        fi
+      done
+
+      mkdir -p /sys/fs/cgroup/cpuacct,cpu/
+      mount --bind /sys/fs/cgroup/cpu,cpuacct/ /sys/fs/cgroup/cpuacct,cpu/
+      mkdir -p /sys/fs/cgroup/net_prio,net_cls/
+      mount --bind /sys/fs/cgroup/net_cls,net_prio/ /sys/fs/cgroup/net_prio,net_cls/
+    fi
 
     # If we are running on SElinux host, need to:
     mkdir -p /opt/cni /etc/cni
@@ -85,8 +91,6 @@ if [ "$1" = "kubelet" ]; then
       echo ${RKE_KUBELET_DOCKER_CONFIG} | base64 -d | tee ${RKE_KUBELET_DOCKER_FILE}
     fi
 
-    CGROUPDRIVER=$(/opt/rke-tools/bin/docker info | grep -i 'cgroup driver' | awk '{print $3}')
-
     # separate flow for cri-dockerd to minimize change to the existing way we run kubelet
     if [ "${RKE_KUBELET_CRIDOCKERD}" == "true" ]; then
 
@@ -96,7 +100,7 @@ if [ "$1" = "kubelet" ]; then
           mkdir -p /.docker && touch /.docker/config.json
           mount --bind ${RKE_KUBELET_DOCKER_FILE} /.docker/config.json
         fi
-        
+
         # Get the value of pause image to start cri-dockerd
         RKE_KUBELET_PAUSEIMAGE=$(echo "$@" | grep -Eo "\-\-pod-infra-container-image+.*" | awk '{print $1}')
         CONTAINER_RUNTIME_ENDPOINT=$(echo "$@" | grep -Eo "\-\-container-runtime-endpoint+.*" | awk '{print $1}' | cut -d "=" -f2)
