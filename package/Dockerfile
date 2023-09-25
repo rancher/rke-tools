@@ -6,7 +6,7 @@ ENV FLANNEL_VERSION=v1.2.0
 ENV ETCD_VERSION=v3.4.25
 ENV CRIDOCKERD_VERSION=0.3.4
 ENV RANCHER_CONFD_VERSION=v0.16.5-rc2
-ENV KUBECTL_VERSION=v1.24.15
+ENV KUBECTL_VERSION=v1.25.14
 
 LABEL maintainer "Rancher Labs <support@rancher.com>"
 ARG ARCH=amd64
@@ -25,7 +25,7 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && curl -sLf "${!DOCKER_URL}" | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 docker/docker \
     && curl -sLf "${CRIDOCKERD_URL}" | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 cri-dockerd/cri-dockerd \
     && chmod +x /opt/rke-tools/bin/cri-dockerd \
-    && curl -sLf "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/local/bin/kubectl \
+    && curl -sLf "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubectl \
     && apk del curl
 
