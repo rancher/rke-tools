@@ -20,9 +20,12 @@ fi
 # In case of AWS cloud provider being configured, RKE will not set `hostname-override` flag because it needs to match the node/instance name in AWS.
 # This will query EC2 metadata and use the value for setting `hostname-override` to match the node/instance name.
 # RKE pull request: https://github.com/rancher/rke/pull/2803
-if [ "$1" = "kube-proxy" ]; then
+if [ "$1" = "kube-proxy" ] || [ "$1" = "kubelet" ]; then
   if echo ${@} | grep -v "hostname-override"; then
     hostname=$(curl "http://169.254.169.254/latest/meta-data/hostname")
+    if [ -z "$hostname" ]; then
+        hostname=$(hostname -f)
+    fi
     set ${@} --hostname-override=$hostname
   fi
 fi
