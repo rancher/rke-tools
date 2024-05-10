@@ -21,5 +21,6 @@ cp -r ../{conf.d,cert-deployer,templates,nginx-proxy,*.sh} .
 
 IMAGE=${REPO}/rke-tools:${TAG}
 docker build --build-arg ARCH=${ARCH} -t ${IMAGE} .
+mkdir -p ../dist
 echo ${IMAGE} > ../dist/images
 echo Built ${IMAGE}
