@@ -1,4 +1,4 @@
-FROM nginx:1.24.0-alpine as base
+FROM nginx:1.26.1-alpine as base
 
 ENV DOCKER_VERSION=25.0.5
 ENV CNI_PLUGINS_VERSION=v1.2.0

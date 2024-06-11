@@ -1,4 +1,5 @@
 ./bin
+!bin/rke-etcd-backup
 ./.dapper
 ./dist
 
