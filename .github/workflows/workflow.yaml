@@ -63,6 +63,9 @@ jobs:
         with:
           name: rke-etcd-backup-${{ github.run_number }}-${{ github.run_attempt }}
           path: .
+      - name: Fix permissions
+        run: |
+          chmod 755 rke-etcd-backup
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
