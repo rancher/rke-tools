@@ -8,7 +8,7 @@ RUN zypper -n install gcc vim less file docker git wget curl go
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
-ENV GOLANGCI_LINT=v1.59.0
+ENV GOLANGCI_LINT=v1.59.1
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s ${GOLANGCI_LINT};
 
 ENV DAPPER_ENV REPO TAG DRONE_TAG
