@@ -8,6 +8,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.70
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.15
+	github.com/urfave/cli/v2 v2.27.3
 )
 
 require (
