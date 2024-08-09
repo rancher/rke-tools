@@ -52,7 +52,7 @@ CMD ["/bin/bash"]
 
 # Temporary image mostly to verify all binaries exist and are
 # valid for the target architecture.
-FROM tonistiigi/xx:1.2.1 AS xx
+FROM tonistiigi/xx:1.4.0 AS xx
 FROM base as test
 COPY --from=xx / /
 
