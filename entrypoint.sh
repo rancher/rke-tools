@@ -115,7 +115,14 @@ if [ "$1" = "kubelet" ]; then
         if [ "${RKE_KUBELET_CRIDOCKERD_DUALSTACK}" == "true" ]; then
           EXTRA_FLAGS="--ipv6-dual-stack"
         fi
-        /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" ${RKE_KUBELET_PAUSEIMAGE} --container-runtime-endpoint=$CONTAINER_RUNTIME_ENDPOINT ${EXTRA_FLAGS} &
+        if [ -z "${CRIDOCKERD_STREAM_SERVER_ADDRESS}" ]; then
+          CRIDOCKERD_STREAM_SERVER_ADDRESS="127.0.0.1"
+        fi
+        if [ -z "${CRIDOCKERD_STREAM_SERVER_PORT}" ]; then
+          CRIDOCKERD_STREAM_SERVER_PORT="10010"
+        fi
+        
+        /opt/rke-tools/bin/cri-dockerd --network-plugin="cni" --cni-conf-dir="/etc/cni/net.d" --cni-bin-dir="/opt/cni/bin" ${RKE_KUBELET_PAUSEIMAGE} --container-runtime-endpoint=$CONTAINER_RUNTIME_ENDPOINT --streaming-bind-addr=${CRIDOCKERD_STREAM_SERVER_ADDRESS}:${CRIDOCKERD_STREAM_SERVER_PORT} ${EXTRA_FLAGS} &
 
         # wait for cri-dockerd to start as kubelet depends on it
         echo "Sleeping 10 waiting for cri-dockerd to start"
