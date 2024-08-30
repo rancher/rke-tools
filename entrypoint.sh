@@ -22,7 +22,8 @@ fi
 # RKE pull request: https://github.com/rancher/rke/pull/2803
 if [ "$1" = "kube-proxy" ] || [ "$1" = "kubelet" ]; then
   if echo ${@} | grep -v "hostname-override"; then
-    hostname=$(curl "http://169.254.169.254/latest/meta-data/hostname")
+    aws_api_token=$(curl -X PUT "http://169.254.169.254/latest/api/token"  -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+    hostname=$(curl -H "X-aws-ec2-metadata-token: $aws_api_token" "http://169.254.169.254/latest/meta-data/hostname")
     if [ -z "$hostname" ]; then
         hostname=$(hostname -f)
     fi
