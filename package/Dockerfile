@@ -3,7 +3,7 @@ FROM nginx:1.27.1-alpine as base
 ENV DOCKER_VERSION=27.1.1
 ENV CNI_PLUGINS_VERSION=v1.5.1
 ENV FLANNEL_VERSION=v1.5.1-flannel1
-ENV ETCD_VERSION=v3.5.15
+ENV ETCD_VERSION=v3.5.16
 ENV CRIDOCKERD_VERSION=0.3.15
 ENV RANCHER_CONFD_VERSION=v0.16.6
 ENV KUBECTL_VERSION=v1.28.11
@@ -25,7 +25,7 @@ RUN apk -U --no-cache add curl wget ca-certificates tar sysstat acl\
     && curl -sLf "${!DOCKER_URL}" | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 docker/docker \
     && curl -sLf "${CRIDOCKERD_URL}" | tar xvzf - -C /opt/rke-tools/bin --strip-components=1 cri-dockerd/cri-dockerd \
     && chmod +x /opt/rke-tools/bin/cri-dockerd \
-    && curl -sLf "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/local/bin/kubectl \
+    && curl -sLf "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/local/bin/kubectl \
     && chmod +x /usr/local/bin/kubectl \
     && apk del curl
 
