@@ -5,12 +5,12 @@ FROM registry.suse.com/bci/bci-busybox:${BCI_VERSION} as final-base
 FROM tonistiigi/xx:1.5.0 AS xx
 FROM registry.suse.com/bci/bci-base:${BCI_VERSION} as build
 
-ENV NGINX_VERSION=1.27.1
-ENV DOCKER_VERSION=27.1.1
+ENV NGINX_VERSION=1.27.2
+ENV DOCKER_VERSION=27.1.2
 ENV ETCD_VERSION=v3.5.16
 ENV CRIDOCKERD_VERSION=0.3.15
 ENV RANCHER_CONFD_VERSION=v0.16.6
-ENV KUBECTL_VERSION=v1.28.11
+ENV KUBECTL_VERSION=v1.28.13
 
 ARG ARCH=amd64
 ENV DOCKER_URL_amd64="https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" \
