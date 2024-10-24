@@ -2,7 +2,7 @@ module rke-tools
 
 go 1.22
 
-toolchain go1.22.6
+toolchain go1.22.8
 
 require (
 	github.com/minio/minio-go/v7 v7.0.74
