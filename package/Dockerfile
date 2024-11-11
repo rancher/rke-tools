@@ -3,6 +3,7 @@ FROM rancher/hardened-cni-plugins:v1.5.1-build20240910 as cni_base
 
 FROM registry.suse.com/bci/bci-busybox:${BCI_VERSION} as final-base
 FROM tonistiigi/xx:1.5.0 AS xx
+FROM nginx:1.27.1 as nginx_base
 FROM registry.suse.com/bci/bci-base:${BCI_VERSION} as build
 
 ENV NGINX_VERSION=1.27.1
@@ -26,12 +27,12 @@ RUN mkdir -p \
 
 COPY --from=final-base / /chroot/
 
-RUN rm -f /chroot/bin/sh && ln -s /chroot/bin/bash /chroot/bin/sh
+RUN rm -f /chroot/bin/sh && ln -s /bin/bash /chroot/bin/sh
 
 RUN zypper refresh && \
     zypper -n in wget file
 RUN zypper --non-interactive refresh && \
-    zypper --installroot /chroot -n in acl bash && \
+    zypper --installroot /chroot -n in acl bash openssl && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/etc/zypp/
 
@@ -54,6 +55,10 @@ COPY conf.d /chroot/etc/confd/conf.d/
 COPY cert-deployer nginx-proxy /chroot/usr/bin/
 COPY entrypoint.sh cloud-provider.sh weave-plugins-cni.sh /chroot/opt/rke-tools/
 COPY rke-etcd-backup /chroot/opt/rke-tools
+
+COPY --from=nginx_base /usr/sbin/nginx /chroot/usr/local/bin/nginx
+
+COPY --from=nginx_base /etc/nginx /chroot/etc/nginx
 
 RUN mkdir -p /opt/cni/bin
 
