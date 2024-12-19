@@ -1358,14 +1358,14 @@ func retrieveAndWriteStatefile(backupName string) error {
 		log.WithFields(log.Fields{
 			"attempt": retries + 1,
 			"name":    backupName,
-		}).Info("Trying to retrieve configmap full-cluster-state using kubectl")
+		}).Info("Trying to retrieve secret full-cluster-state using kubectl")
 
 		if retries > 0 {
 			time.Sleep(failureInterval)
 		}
 
 		// Try to retrieve cluster state to include in snapshot
-		cmd := exec.Command("/usr/local/bin/kubectl", "--request-timeout=30s", "--kubeconfig", "/etc/kubernetes/ssl/kubecfg-kube-node.yaml", "-n", "kube-system", "get", "configmap", "full-cluster-state", "-o", "json")
+		cmd := exec.Command("/usr/local/bin/kubectl", "--request-timeout=30s", "--kubeconfig", "/etc/kubernetes/ssl/kubecfg-kube-node.yaml", "-n", "kube-system", "get", "secret", "full-cluster-state", "-o", "json")
 		var stderr bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &stderr
@@ -1375,9 +1375,9 @@ func retrieveAndWriteStatefile(backupName string) error {
 				"attempt": retries + 1,
 				"name":    backupName,
 				"err":     fmt.Sprintf("%s: %s", err, stderr.String()),
-			}).Warn("Failed to retrieve configmap full-cluster-state using kubectl")
+			}).Warn("Failed to retrieve secret full-cluster-state using kubectl")
 			if retries >= defaultBackupRetries {
-				return fmt.Errorf("Failed to retrieve configmap full-cluster-state using kubectl: %v", fmt.Sprintf("%s: %s", err, stderr.String()))
+				return fmt.Errorf("Failed to retrieve secret full-cluster-state using kubectl: %v", fmt.Sprintf("%s: %s", err, stderr.String()))
 			}
 			continue
 		}
@@ -1386,20 +1386,27 @@ func retrieveAndWriteStatefile(backupName string) error {
 	var m map[string]interface{}
 	err = json.Unmarshal(out.Bytes(), &m)
 	if err != nil {
-		return fmt.Errorf("Failed to unmarshal cluster state from configmap full-cluster-state: %v", err)
+		return fmt.Errorf("Failed to unmarshal cluster state from secret full-cluster-state: %v", err)
 	}
 
+	// Extract the data field from the secret
 	var jsondata map[string]interface{}
-	var fullClusterState string
+	var encodedFullClusterState string
 	if _, ok := m["data"]; ok {
 		jsondata = m["data"].(map[string]interface{})
 	}
 	if str, ok := jsondata["full-cluster-state"].(string); ok {
-		fullClusterState = str
+		encodedFullClusterState = str
+	}
+
+	// Decode the base64-encoded full-cluster-state
+	fullClusterState, err := base64.StdEncoding.DecodeString(encodedFullClusterState)
+	if err != nil {
+		return fmt.Errorf("Failed to decode base64 full-cluster-state: %v", err)
 	}
 
 	var prettyFullClusterState bytes.Buffer
-	err = json.Indent(&prettyFullClusterState, []byte(fullClusterState), "", "  ")
+	err = json.Indent(&prettyFullClusterState, fullClusterState, "", "  ")
 	if err != nil {
 		return fmt.Errorf("Failed to indent JSON for state file: %v", err)
 	}
