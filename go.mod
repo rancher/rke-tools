@@ -1,4 +1,4 @@
-module rke-tools
+module github.com/rancher/rke-tools
 
 go 1.22
 
