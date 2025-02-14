@@ -1,8 +1,8 @@
 module github.com/rancher/rke-tools
 
-go 1.22
+go 1.23
 
-toolchain go1.22.8
+toolchain go1.23.6
 
 require (
 	github.com/minio/minio-go/v7 v7.0.74
