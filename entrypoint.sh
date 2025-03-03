@@ -7,6 +7,11 @@ if [ "$1" = "kubelet" ] || [ "$1" = "kube-proxy" ]; then
   update-alternatives --set iptables /usr/sbin/iptables-wrapper
 fi
 
+# br_netfilter is required for canal and flannel network plugins.
+if [ "$1" = "kube-proxy" ] && [ "${RKE_KUBE_PROXY_BR_NETFILTER}" = "true" ]; then
+    modprobe br_netfilter || true
+fi
+
 # generate Azure cloud provider config if configured
 if echo ${@} | grep -q "cloud-provider=azure"; then
   if [ "$1" = "kubelet" ] || [ "$1" = "kube-apiserver" ] || [ "$1" = "kube-controller-manager" ]; then
