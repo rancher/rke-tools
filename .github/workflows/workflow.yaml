@@ -27,7 +27,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
           version: v1.58
           args: --disable-all -E revive
